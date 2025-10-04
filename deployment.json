@@ -1,0 +1,11 @@
+{
+  "contractAddress": "0x575e0532445489dd31C12615BeC7C63d737B69DD",
+  "contractName": "SocialPlatform",
+  "network": "BSC Testnet",
+  "chainId": 97,
+  "deployer": "0x6599D7b19d27949a1F23aeCA9566A2a2b86300b8",
+  "deployerBalance": "0.3",
+  "transactionHash": "0xfab215e520f1ef8b1c0b57a1d15e760c163b2bf6c29b8b2511c016a4c8e8178e",
+  "timestamp": "2025-09-10T20:30:37.569Z",
+  "explorerUrl": "https://testnet.bscscan.com/address/0x575e0532445489dd31C12615BeC7C63d737B69DD"
+}
