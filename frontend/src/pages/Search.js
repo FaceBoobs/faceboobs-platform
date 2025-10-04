@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search as SearchIcon, Filter, Star } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
+import supabase from '../supabaseClient';
 
 const Search = ({ contract, user, viewOnly = false }) => {
   const { toast } = useToast();
@@ -18,58 +19,27 @@ const Search = ({ contract, user, viewOnly = false }) => {
     }
 
     setLoading(true);
-    
-    try {
-      // Simulazione ricerca (in produzione useresti un database o indexing)
-      const mockUsers = [
-        {
-          address: '0x1234567890123456789012345678901234567890',
-          username: 'crypto_artist',
-          bio: 'Digital artist creating unique NFT collections',
-          isCreator: true,
-          followersCount: 1250,
-          verified: true
-        },
-        {
-          address: '0x2345678901234567890123456789012345678901',
-          username: 'defi_master',
-          bio: 'DeFi expert sharing market insights',
-          isCreator: true,
-          followersCount: 890,
-          verified: false
-        },
-        {
-          address: '0x3456789012345678901234567890123456789012',
-          username: 'web3_educator',
-          bio: 'Teaching Web3 and blockchain technology',
-          isCreator: true,
-          followersCount: 2100,
-          verified: true
-        },
-        {
-          address: '0x4567890123456789012345678901234567890123',
-          username: 'nft_collector',
-          bio: 'Collector and trader of rare NFTs',
-          isCreator: false,
-          followersCount: 450,
-          verified: false
-        }
-      ];
 
-      let filtered = mockUsers.filter(user => 
-        user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.bio.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .or(`username.ilike.%${searchQuery}%,bio.ilike.%${searchQuery}%`);
+
+      if (error) throw error;
+
+      let filtered = data || [];
 
       if (filterCreatorsOnly) {
         filtered = filtered.filter(user => user.isCreator);
       }
 
-      filtered.sort((a, b) => b.followersCount - a.followersCount);
+      filtered.sort((a, b) => (b.followersCount || 0) - (a.followersCount || 0));
       setSearchResults(filtered);
-      
+
     } catch (error) {
       console.error('Search error:', error);
+      toast.error('Search failed');
     } finally {
       setLoading(false);
     }
