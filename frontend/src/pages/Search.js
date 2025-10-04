@@ -106,7 +106,7 @@ const Search = ({ contract, user, viewOnly = false }) => {
             <p className="text-gray-600 text-sm mb-2">{userData.bio}</p>
             
             <div className="flex items-center space-x-4 text-sm text-gray-500">
-              <span>{userData.followersCount.toLocaleString()} followers</span>
+              <span>{(userData.followersCount || 0).toLocaleString()} followers</span>
               {userData.isCreator && (
                 <span className="text-green-600">Earning creator</span>
               )}
