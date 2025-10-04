@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search as SearchIcon, Filter, Star } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
-import supabase from '../supabaseClient';
+import { supabase } from '../supabaseClient';
 
 const Search = ({ contract, user, viewOnly = false }) => {
   const { toast } = useToast();
