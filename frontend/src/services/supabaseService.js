@@ -361,6 +361,34 @@ export class SupabaseService {
   }
 
   // Users
+  static async createUser(userData) {
+    try {
+      console.log('🔄 Inserting user into Supabase...');
+      console.log('📊 Data to insert:', userData);
+
+      const { data, error } = await supabase
+        .from('users')
+        .insert([userData])
+        .select();
+
+      if (error) {
+        console.error('❌ Supabase insert error:', error);
+        console.error('❌ Error code:', error.code);
+        console.error('❌ Error message:', error.message);
+        console.error('❌ Error details:', error.details);
+        throw error;
+      }
+
+      console.log('✅ Supabase insert successful');
+      console.log('✅ Inserted data:', data);
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('❌ Error creating user:', error);
+      return { success: false, error: error.message, details: error };
+    }
+  }
+
   static async createOrUpdateUser(userData) {
     try {
       const { data, error } = await supabase

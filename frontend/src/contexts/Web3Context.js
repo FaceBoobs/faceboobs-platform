@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import CONTRACT_ABI from '../contracts/SocialPlatform.json';
+import { SupabaseService } from '../services/supabaseService';
 
 const CONTRACT_ADDRESS = "0x575e0532445489dd31C12615BeC7C63d737B69DD";
 const BSC_TESTNET_CHAIN_ID = 97;
@@ -234,8 +235,38 @@ export const Web3Provider = ({ children }) => {
         avatarHash = await uploadMedia(avatarFile);
       }
 
+      // Register user on blockchain
       const tx = await contract.registerUser(username.trim(), avatarHash, bio || '');
       await tx.wait();
+
+      // Save user to Supabase
+      console.log('📝 Preparando dati per Supabase...');
+      console.log('Account address:', account);
+      console.log('Username:', username.trim());
+      console.log('Bio:', bio || '');
+      console.log('Avatar hash:', avatarHash);
+
+      const userData = {
+        wallet_address: account.toLowerCase(),
+        username: username.trim(),
+        bio: bio || '',
+        avatar_url: avatarHash !== 'QmDefaultAvatar' ? avatarHash : null,
+        is_creator: false,
+        followers_count: 0,
+        following_count: 0
+      };
+
+      console.log('📤 Dati da inserire in Supabase:', userData);
+
+      const supabaseResult = await SupabaseService.createUser(userData);
+
+      if (!supabaseResult.success) {
+        console.error('❌ Failed to save user to Supabase:', supabaseResult.error);
+        console.error('❌ Error details:', supabaseResult);
+      } else {
+        console.log('✅ User saved to Supabase successfully');
+        console.log('✅ Supabase response:', supabaseResult.data);
+      }
 
       await loadUserData(contract, account);
 
