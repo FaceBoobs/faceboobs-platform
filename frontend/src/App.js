@@ -3,9 +3,6 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 
-// Test Supabase (remove in production)
-import './test-supabase';
-
 // Context
 import { Web3Provider, useWeb3 } from './contexts/Web3Context';
 import { NotificationsProvider } from './contexts/NotificationsContext';
