@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase } from '../supabaseClient'
 
 // Upload immagine
 export const uploadImage = async (file) => {
