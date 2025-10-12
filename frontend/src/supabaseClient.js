@@ -7,5 +7,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Supabase credentials missing!')
 }
 
+// Named export only - use: import { supabase } from './supabaseClient'
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-export default supabase
