@@ -437,6 +437,173 @@ export class SupabaseService {
     }
   }
 
+  // Follows
+  static async followUser(followerAddress, followedAddress) {
+    try {
+      console.log('🔄 Following user:', followerAddress, '->', followedAddress);
+
+      // Check if already following
+      const { data: existingFollow, error: checkError } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_address', followerAddress)
+        .eq('followed_address', followedAddress)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+
+      if (existingFollow) {
+        console.log('⚠️ Already following this user');
+        return { success: true, action: 'already_following' };
+      }
+
+      // Insert follow relationship
+      const { error: insertError } = await supabase
+        .from('follows')
+        .insert([{
+          follower_address: followerAddress,
+          followed_address: followedAddress
+        }]);
+
+      if (insertError) throw insertError;
+
+      // Update follower count for followed user
+      const { data: followedUser, error: fetchError } = await supabase
+        .from('users')
+        .select('followers_count')
+        .eq('wallet_address', followedAddress)
+        .single();
+
+      if (!fetchError && followedUser) {
+        await supabase
+          .from('users')
+          .update({ followers_count: (followedUser.followers_count || 0) + 1 })
+          .eq('wallet_address', followedAddress);
+      }
+
+      // Update following count for follower user
+      const { data: followerUser, error: followerFetchError } = await supabase
+        .from('users')
+        .select('following_count')
+        .eq('wallet_address', followerAddress)
+        .single();
+
+      if (!followerFetchError && followerUser) {
+        await supabase
+          .from('users')
+          .update({ following_count: (followerUser.following_count || 0) + 1 })
+          .eq('wallet_address', followerAddress);
+      }
+
+      console.log('✅ Successfully followed user');
+      return { success: true, action: 'followed' };
+    } catch (error) {
+      console.error('❌ Error following user:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async unfollowUser(followerAddress, followedAddress) {
+    try {
+      console.log('🔄 Unfollowing user:', followerAddress, '-x->', followedAddress);
+
+      // Delete follow relationship
+      const { error: deleteError } = await supabase
+        .from('follows')
+        .delete()
+        .eq('follower_address', followerAddress)
+        .eq('followed_address', followedAddress);
+
+      if (deleteError) throw deleteError;
+
+      // Update follower count for followed user
+      const { data: followedUser, error: fetchError } = await supabase
+        .from('users')
+        .select('followers_count')
+        .eq('wallet_address', followedAddress)
+        .single();
+
+      if (!fetchError && followedUser) {
+        await supabase
+          .from('users')
+          .update({ followers_count: Math.max(0, (followedUser.followers_count || 0) - 1) })
+          .eq('wallet_address', followedAddress);
+      }
+
+      // Update following count for follower user
+      const { data: followerUser, error: followerFetchError } = await supabase
+        .from('users')
+        .select('following_count')
+        .eq('wallet_address', followerAddress)
+        .single();
+
+      if (!followerFetchError && followerUser) {
+        await supabase
+          .from('users')
+          .update({ following_count: Math.max(0, (followerUser.following_count || 0) - 1) })
+          .eq('wallet_address', followerAddress);
+      }
+
+      console.log('✅ Successfully unfollowed user');
+      return { success: true, action: 'unfollowed' };
+    } catch (error) {
+      console.error('❌ Error unfollowing user:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async isFollowing(followerAddress, followedAddress) {
+    try {
+      const { data, error } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_address', followerAddress)
+        .eq('followed_address', followedAddress)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      return { success: true, isFollowing: !!data };
+    } catch (error) {
+      console.error('❌ Error checking follow status:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async getFollowers(userAddress) {
+    try {
+      const { data, error } = await supabase
+        .from('follows')
+        .select('follower_address')
+        .eq('followed_address', userAddress);
+
+      if (error) throw error;
+      return { success: true, data: data.map(f => f.follower_address) };
+    } catch (error) {
+      console.error('❌ Error fetching followers:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async getFollowing(userAddress) {
+    try {
+      const { data, error } = await supabase
+        .from('follows')
+        .select('followed_address')
+        .eq('follower_address', userAddress);
+
+      if (error) throw error;
+      return { success: true, data: data.map(f => f.followed_address) };
+    } catch (error) {
+      console.error('❌ Error fetching following:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Purchases
   static async createPurchase(purchaseData) {
     try {

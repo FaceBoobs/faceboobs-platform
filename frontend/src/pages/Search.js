@@ -1,9 +1,10 @@
 // src/pages/Search.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search as SearchIcon, Filter, Star } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../supabaseClient';
+import { SupabaseService } from '../services/supabaseService';
 
 const Search = ({ contract, user, viewOnly = false }) => {
   const { toast } = useToast();
@@ -11,6 +12,31 @@ const Search = ({ contract, user, viewOnly = false }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [filterCreatorsOnly, setFilterCreatorsOnly] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [followingMap, setFollowingMap] = useState({}); // Track following status for each user
+
+  // Load following status when user logs in or search results change
+  useEffect(() => {
+    if (user?.address && searchResults.length > 0) {
+      loadFollowingStatus();
+    }
+  }, [user, searchResults]);
+
+  const loadFollowingStatus = async () => {
+    if (!user?.address) return;
+
+    try {
+      const result = await SupabaseService.getFollowing(user.address);
+      if (result.success) {
+        const map = {};
+        result.data.forEach(address => {
+          map[address] = true;
+        });
+        setFollowingMap(map);
+      }
+    } catch (error) {
+      console.error('Error loading following status:', error);
+    }
+  };
 
   const performSearch = async () => {
     if (!searchQuery.trim()) {
@@ -31,10 +57,10 @@ const Search = ({ contract, user, viewOnly = false }) => {
       let filtered = data || [];
 
       if (filterCreatorsOnly) {
-        filtered = filtered.filter(user => user.isCreator);
+        filtered = filtered.filter(user => user.is_creator);
       }
 
-      filtered.sort((a, b) => (b.followersCount || 0) - (a.followersCount || 0));
+      filtered.sort((a, b) => (b.followers_count || 0) - (a.followers_count || 0));
       setSearchResults(filtered);
 
     } catch (error) {
@@ -46,19 +72,49 @@ const Search = ({ contract, user, viewOnly = false }) => {
   };
 
   const UserCard = ({ userData }) => {
-    const [isFollowing, setIsFollowing] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
+    const isFollowing = followingMap[userData.wallet_address] || false;
 
     const handleFollow = async () => {
-      if (!contract) return;
-      
+      if (!user?.address) {
+        toast.error('Please connect your wallet to follow users');
+        return;
+      }
+
       try {
         setFollowLoading(true);
-        const tx = isFollowing 
-          ? await contract.unfollowUser(userData.address)
-          : await contract.followUser(userData.address);
-        await tx.wait();
-        setIsFollowing(!isFollowing);
+
+        // Save to Supabase database
+        const result = isFollowing
+          ? await SupabaseService.unfollowUser(user.address, userData.wallet_address)
+          : await SupabaseService.followUser(user.address, userData.wallet_address);
+
+        if (result.success) {
+          // Update local following map
+          setFollowingMap(prev => ({
+            ...prev,
+            [userData.wallet_address]: !isFollowing
+          }));
+
+          // Try to update blockchain if contract available (optional)
+          if (contract) {
+            try {
+              const tx = isFollowing
+                ? await contract.unfollowUser(userData.wallet_address)
+                : await contract.followUser(userData.wallet_address);
+              await tx.wait();
+            } catch (blockchainError) {
+              console.warn('Blockchain update failed, but database is updated:', blockchainError);
+            }
+          }
+
+          toast.success(isFollowing ? 'Unfollowed successfully!' : 'Following successfully!');
+
+          // Reload search results to show updated follower counts
+          await performSearch();
+        } else {
+          toast.error('Follow action failed: ' + result.error);
+        }
       } catch (error) {
         console.error('Follow error:', error);
         toast.error('Follow action failed');
@@ -68,15 +124,18 @@ const Search = ({ contract, user, viewOnly = false }) => {
     };
 
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer">
         <div className="flex items-center space-x-4">
-          <div className="relative">
+          <Link
+            to={`/profile/${userData.wallet_address}`}
+            className="relative flex-shrink-0"
+          >
             <div className="w-16 h-16 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center">
               <span className="text-pink-800 text-xl font-bold">
-                {userData.username.charAt(0).toUpperCase()}
+                {userData.username?.charAt(0).toUpperCase() || '?'}
               </span>
             </div>
-            {userData.isCreator && (
+            {userData.is_creator && (
               <div className="absolute -bottom-1 -right-1 bg-purple-500 text-white rounded-full p-1">
                 <Star size={12} />
               </div>
@@ -86,38 +145,38 @@ const Search = ({ contract, user, viewOnly = false }) => {
                 <span className="text-xs">✓</span>
               </div>
             )}
-          </div>
+          </Link>
 
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-1">
-              <Link 
-                to={`/profile/${userData.address}`}
-                className="font-semibold text-gray-900 hover:text-blue-600 transition-colors"
+              <Link
+                to={`/profile/${userData.wallet_address}`}
+                className="font-semibold text-gray-900 hover:text-blue-600 transition-colors truncate"
               >
-                {userData.username}
+                {userData.username || 'Anonymous'}
               </Link>
-              {userData.isCreator && (
-                <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-medium">
+              {userData.is_creator && (
+                <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0">
                   Creator
                 </span>
               )}
             </div>
-            
-            <p className="text-gray-600 text-sm mb-2">{userData.bio}</p>
-            
+
+            <p className="text-gray-600 text-sm mb-2 line-clamp-2">{userData.bio || 'No bio available'}</p>
+
             <div className="flex items-center space-x-4 text-sm text-gray-500">
-              <span>{(userData.followersCount || 0).toLocaleString()} followers</span>
-              {userData.isCreator && (
+              <span>{(userData.followers_count || 0).toLocaleString()} followers</span>
+              {userData.is_creator && (
                 <span className="text-green-600">Earning creator</span>
               )}
             </div>
           </div>
 
-          {!viewOnly && userData.address !== user?.address && (
+          {!viewOnly && userData.wallet_address !== user?.address && (
             <button
               onClick={handleFollow}
               disabled={followLoading}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+              className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 flex-shrink-0 ${
                 isFollowing
                   ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   : 'bg-blue-500 text-white hover:bg-blue-600'
@@ -127,7 +186,7 @@ const Search = ({ contract, user, viewOnly = false }) => {
             </button>
           )}
           {viewOnly && (
-            <span className="text-gray-400 text-sm">Connect wallet to follow</span>
+            <span className="text-gray-400 text-sm flex-shrink-0">Connect wallet to follow</span>
           )}
         </div>
       </div>
