@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useToast } from './ToastContext';
 import { useWeb3 } from './Web3Context';
-import SupabaseService from '../services/supabaseService';
+import { SupabaseService } from '../services/supabaseService';
 
 const CommentsContext = createContext();
 

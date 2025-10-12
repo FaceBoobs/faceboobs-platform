@@ -6,7 +6,7 @@ import { useLikes } from '../contexts/LikesContext';
 import { useComments } from '../contexts/CommentsContext';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
-import SupabaseService from '../services/supabaseService';
+import { SupabaseService } from '../services/supabaseService';
 import LikeButton from '../components/LikeButton';
 import CommentButton from '../components/CommentButton';
 import ShareButton from '../components/ShareButton';

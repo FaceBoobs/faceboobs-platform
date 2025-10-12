@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, Search, Plus, X } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
-import SupabaseService from '../services/supabaseService';
+import { SupabaseService } from '../services/supabaseService';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const Messages = () => {

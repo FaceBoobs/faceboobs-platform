@@ -4,7 +4,7 @@ import { Upload, DollarSign, Lock, Globe } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
-import SupabaseService from '../services/supabaseService';
+import { SupabaseService } from '../services/supabaseService';
 import CompressionIndicator from '../components/CompressionIndicator';
 
 const CreatePost = () => {

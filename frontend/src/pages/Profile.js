@@ -6,7 +6,7 @@ import { Edit, UserPlus, UserMinus, Grid, Trash2 } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import EditProfileModal from '../components/EditProfileModal';
-import SupabaseService from '../services/supabaseService';
+import { SupabaseService } from '../services/supabaseService';
 
 const Profile = () => {
   const { contract, user, getMediaUrl, updateProfile, loading: web3Loading } = useWeb3();

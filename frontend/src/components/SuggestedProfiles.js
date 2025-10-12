@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, RefreshCw } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
-import SupabaseService from '../services/supabaseService';
+import { SupabaseService } from '../services/supabaseService';
 
 const SuggestedProfiles = () => {
   const { user: currentUser, account, getMediaUrl } = useWeb3();
