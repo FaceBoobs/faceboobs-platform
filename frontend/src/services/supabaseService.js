@@ -393,7 +393,7 @@ export class SupabaseService {
     try {
       const { data, error } = await supabase
         .from('users')
-        .upsert([userData], { onConflict: 'address' })
+        .upsert([userData], { onConflict: 'wallet_address' })
         .select()
         .single();
 
@@ -410,7 +410,7 @@ export class SupabaseService {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('address', address)
+        .eq('wallet_address', address)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;

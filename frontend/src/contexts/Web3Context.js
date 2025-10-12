@@ -197,7 +197,7 @@ export const Web3Provider = ({ children }) => {
       const userData = await contractInstance.getUser(userAccount);
 
       if (userData.exists) {
-        setUser({
+        const userObj = {
           address: userAccount,
           username: userData.username,
           avatarHash: userData.avatarHash,
@@ -206,15 +206,83 @@ export const Web3Provider = ({ children }) => {
           followersCount: Number(userData.followersCount),
           followingCount: Number(userData.followingCount),
           totalEarnings: userData.totalEarnings
-        });
-        console.log('✅ User data loaded successfully');
+        };
+
+        setUser(userObj);
+        console.log('✅ User data loaded from blockchain');
+
+        // Sync with Supabase
+        await syncUserToSupabase(userObj);
       } else {
         setUser(null);
-        console.log('ℹ️ User not registered');
+        console.log('ℹ️ User not registered on blockchain');
+
+        // Check if user exists in Supabase (connected but not registered)
+        await checkOrCreateSupabaseUser(userAccount);
       }
     } catch (error) {
       console.error('❌ Error loading user data:', error);
       setUser(null);
+    }
+  };
+
+  const checkOrCreateSupabaseUser = async (walletAddress) => {
+    try {
+      console.log('🔍 Checking if user exists in Supabase...');
+
+      const { data: existingUser } = await SupabaseService.getUser(walletAddress.toLowerCase());
+
+      if (!existingUser) {
+        console.log('📝 Creating new user record in Supabase...');
+
+        const newUserData = {
+          wallet_address: walletAddress.toLowerCase(),
+          username: null,
+          bio: null,
+          avatar_url: null,
+          is_creator: false,
+          followers_count: 0,
+          following_count: 0
+        };
+
+        const result = await SupabaseService.createUser(newUserData);
+
+        if (result.success) {
+          console.log('✅ User created in Supabase on first connection');
+        } else {
+          console.error('❌ Failed to create user in Supabase:', result.error);
+        }
+      } else {
+        console.log('✅ User already exists in Supabase');
+      }
+    } catch (error) {
+      console.error('❌ Error checking/creating Supabase user:', error);
+    }
+  };
+
+  const syncUserToSupabase = async (userObj) => {
+    try {
+      console.log('🔄 Syncing user data to Supabase...');
+
+      const supabaseData = {
+        wallet_address: userObj.address.toLowerCase(),
+        username: userObj.username || null,
+        bio: userObj.bio || null,
+        avatar_url: userObj.avatarHash !== 'QmDefaultAvatar' ? userObj.avatarHash : null,
+        is_creator: userObj.isCreator,
+        followers_count: userObj.followersCount,
+        following_count: userObj.followingCount
+      };
+
+      const result = await SupabaseService.createOrUpdateUser(supabaseData);
+
+      if (result.success) {
+        console.log('✅ User data synced to Supabase');
+      } else {
+        console.error('⚠️ Failed to sync user to Supabase:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error syncing user to Supabase:', error);
     }
   };
 
@@ -306,9 +374,26 @@ export const Web3Provider = ({ children }) => {
     try {
       setLoading(true);
 
+      // Update blockchain
       const tx = await contract.becomeCreator();
       await tx.wait();
 
+      // Update Supabase
+      console.log('📝 Updating is_creator in Supabase...');
+      const supabaseUpdate = {
+        wallet_address: account.toLowerCase(),
+        is_creator: true
+      };
+
+      const result = await SupabaseService.createOrUpdateUser(supabaseUpdate);
+
+      if (result.success) {
+        console.log('✅ is_creator updated in Supabase');
+      } else {
+        console.error('⚠️ Failed to update is_creator in Supabase:', result.error);
+      }
+
+      // Reload user data
       await loadUserData(contract, account);
 
       return { success: true, message: 'Congratulations! You are now a creator!' };
@@ -351,9 +436,28 @@ export const Web3Provider = ({ children }) => {
         avatarHash = await uploadMedia(avatarFile);
       }
 
+      // Update blockchain
       const tx = await contract.updateProfile(username.trim(), avatarHash, bio || '');
       await tx.wait();
 
+      // Update Supabase
+      console.log('📝 Updating profile in Supabase...');
+      const supabaseUpdate = {
+        wallet_address: account.toLowerCase(),
+        username: username.trim(),
+        bio: bio || null,
+        avatar_url: avatarHash !== 'QmDefaultAvatar' ? avatarHash : null
+      };
+
+      const result = await SupabaseService.createOrUpdateUser(supabaseUpdate);
+
+      if (result.success) {
+        console.log('✅ Profile updated in Supabase');
+      } else {
+        console.error('⚠️ Failed to update profile in Supabase:', result.error);
+      }
+
+      // Reload user data
       await loadUserData(contract, account);
 
       return { success: true, message: 'Profile updated successfully!' };
