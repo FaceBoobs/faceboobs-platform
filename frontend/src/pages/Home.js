@@ -7,6 +7,7 @@ import { useComments } from '../contexts/CommentsContext';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import { SupabaseService } from '../services/supabaseService';
+import { getFollowing } from '../services/followService';
 import LikeButton from '../components/LikeButton';
 import CommentButton from '../components/CommentButton';
 import ShareButton from '../components/ShareButton';
@@ -63,23 +64,27 @@ const Home = () => {
 
   const loadFollowingList = async () => {
     try {
-      console.log('📋 Loading following list for:', account);
+      console.log('📋 [Home] Loading following list for:', account);
 
       if (!account) {
-        console.log('⚠️ Account not available yet');
+        console.log('⚠️ [Home] Account not available yet');
         return;
       }
 
-      // Get the list of addresses the user is following from Supabase database
-      console.log('🔄 Calling SupabaseService.getFollowing...');
-      const result = await SupabaseService.getFollowing(account);
+      // Get the list of addresses the user is following using followService
+      console.log('🔄 [Home] Calling getFollowing from followService...');
+      const result = await getFollowing(account);
 
-      if (result.success) {
-        console.log('✅ User is following:', result.data.length, 'addresses', result.data);
-        setFollowingAddresses(result.data);
-        setHasFollows(result.data.length > 0);
+      if (result.success && result.data) {
+        // Extract just the addresses from the result
+        const addresses = result.data;
+        console.log('✅ [Home] Following addresses loaded:', addresses.length, 'addresses');
+        console.log('📋 [Home] Following addresses:', addresses);
+
+        setFollowingAddresses(addresses);
+        setHasFollows(addresses.length > 0);
       } else {
-        console.error('❌ Failed to load following list:', result.error);
+        console.error('❌ [Home] Failed to load following list:', result.error);
         setFollowingAddresses([]);
         setHasFollows(false);
       }
@@ -88,18 +93,19 @@ const Home = () => {
       if (contract && contract.getFollowing) {
         try {
           const blockchainFollowing = await contract.getFollowing(account);
-          console.log('🔗 Blockchain following:', blockchainFollowing.length, 'addresses');
+          console.log('🔗 [Home] Blockchain following:', blockchainFollowing.length, 'addresses');
 
           // You can compare and sync here if needed
           if (blockchainFollowing.length !== result.data?.length) {
-            console.warn('⚠️ Blockchain and database following lists differ!');
+            console.warn('⚠️ [Home] Blockchain and database following lists differ!');
           }
         } catch (blockchainError) {
-          console.warn('⚠️ Blockchain sync failed (using database only):', blockchainError);
+          console.warn('⚠️ [Home] Blockchain sync failed (using database only):', blockchainError);
         }
       }
     } catch (error) {
-      console.error('❌ Error loading following list:', error);
+      console.error('❌ [Home] Error loading following list:', error);
+      console.error('❌ [Home] Error details:', error.message, error.stack);
       setFollowingAddresses([]);
       setHasFollows(false);
     }
