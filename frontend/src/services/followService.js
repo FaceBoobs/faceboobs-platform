@@ -68,17 +68,31 @@ export const unfollowUser = async (followerAddress, followedAddress) => {
 export const getFollowing = async (userAddress) => {
   try {
     console.log('🔄 followService.getFollowing for:', userAddress);
+    console.log('📊 Type:', typeof userAddress, '| Value:', userAddress);
 
     if (!userAddress) {
       console.error('❌ User address is required');
       return { success: false, error: 'User address is required', data: [] };
     }
 
+    console.log('📞 Calling SupabaseService.getFollowing...');
     const result = await SupabaseService.getFollowing(userAddress);
+    console.log('📬 SupabaseService.getFollowing result:', {
+      success: result.success,
+      dataType: Array.isArray(result.data) ? 'array' : typeof result.data,
+      dataLength: result.data?.length || 0,
+      error: result.error || 'none'
+    });
 
     if (result.success) {
       console.log('✅ getFollowing successful:', result.data.length, 'following');
       console.log('📋 Following addresses:', result.data);
+
+      // Validazione extra: assicurati che result.data sia un array
+      if (!Array.isArray(result.data)) {
+        console.error('⚠️ WARNING: result.data is not an array!', result.data);
+        return { success: false, error: 'Invalid data format', data: [] };
+      }
     } else {
       console.error('❌ getFollowing failed:', result.error);
     }
@@ -86,6 +100,7 @@ export const getFollowing = async (userAddress) => {
     return result;
   } catch (error) {
     console.error('❌ Error in followService.getFollowing:', error);
+    console.error('❌ Error stack:', error.stack);
     return { success: false, error: error.message, data: [] };
   }
 };

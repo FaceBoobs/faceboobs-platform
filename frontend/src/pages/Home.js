@@ -76,8 +76,8 @@ const Home = () => {
       const result = await getFollowing(account);
 
       if (result.success && result.data) {
-        // Extract just the addresses from the result
-        const addresses = result.data;
+        // result.data is already an array of addresses from SupabaseService.getFollowing
+        const addresses = result.data; // Already processed by followService
         console.log('✅ [Home] Following addresses loaded:', addresses.length, 'addresses');
         console.log('📋 [Home] Following addresses:', addresses);
 
