@@ -17,35 +17,65 @@ const SuggestedProfiles = () => {
   const loadSuggestedProfiles = async () => {
     try {
       setLoading(true);
+      console.log('🔍 [SuggestedProfiles] Loading users from Supabase...');
 
       // Get all users from Supabase (excluding current user)
       const response = await SupabaseService.getAllUsers();
 
+      console.log('📬 [SuggestedProfiles] Supabase response:', {
+        success: response.success,
+        dataCount: response.data?.length || 0
+      });
+
       if (response.success && response.data) {
-        // Filter out current user
-        const otherUsers = response.data.filter(user =>
-          user.address !== account?.toLowerCase()
-        );
+        console.log('📊 [SuggestedProfiles] Sample raw user from DB:', response.data[0]);
+        console.log('📊 [SuggestedProfiles] Available fields:', Object.keys(response.data[0] || {}));
+
+        // Filter out current user - try both 'address' and 'wallet_address' fields
+        const otherUsers = response.data.filter(user => {
+          const userAddr = user.wallet_address || user.address;
+          return userAddr?.toLowerCase() !== account?.toLowerCase();
+        });
+
+        console.log('👥 [SuggestedProfiles] Other users count:', otherUsers.length);
 
         // Shuffle array and take first 3
         const shuffled = [...otherUsers].sort(() => Math.random() - 0.5);
         const selected = shuffled.slice(0, 3);
 
         // Transform to match expected format
-        const transformedUsers = selected.map(user => ({
-          id: user.id,
-          username: user.username || `User${user.address?.substring(0, 6)}`,
-          walletAddress: user.address,
-          avatarHash: user.avatar_hash,
-          bio: user.bio || '',
-          isCreator: user.is_creator || false,
-          createdAt: user.created_at
-        }));
+        const transformedUsers = selected.map(user => {
+          // Handle both possible field names: wallet_address or address
+          const walletAddr = user.wallet_address || user.address;
+
+          console.log('📝 [SuggestedProfiles] Transforming user:', {
+            id: user.id,
+            username: user.username,
+            wallet_address: user.wallet_address,
+            address: user.address,
+            chosen: walletAddr
+          });
+
+          return {
+            id: user.id,
+            username: user.username || `User${walletAddr?.substring(0, 6)}`,
+            walletAddress: walletAddr, // Use wallet_address or address
+            avatarHash: user.avatar_hash,
+            bio: user.bio || '',
+            isCreator: user.is_creator || false,
+            createdAt: user.created_at
+          };
+        });
+
+        console.log('✅ [SuggestedProfiles] Transformed users:', transformedUsers);
+        console.log('🔍 [SuggestedProfiles] Check walletAddress field:',
+          transformedUsers.map(u => ({ username: u.username, walletAddress: u.walletAddress }))
+        );
 
         setSuggestedUsers(transformedUsers);
       }
     } catch (error) {
-      console.error('Error loading suggested profiles:', error);
+      console.error('❌ [SuggestedProfiles] Error loading suggested profiles:', error);
       toast.error('Failed to load suggested profiles');
     } finally {
       setLoading(false);
@@ -66,14 +96,34 @@ const SuggestedProfiles = () => {
     console.log('📊 Current state:');
     console.log('   - currentUser:', currentUser?.username, currentUser?.address);
     console.log('   - account:', account);
-    console.log('   - userToFollow:', userToFollow.username, userToFollow.walletAddress);
+    console.log('   - userToFollow.username:', userToFollow.username);
+    console.log('   - userToFollow.walletAddress:', userToFollow.walletAddress);
     console.log('   - userToFollow.id:', userToFollow.id);
+    console.log('   - userToFollow FULL OBJECT:', userToFollow);
 
+    // Validation 1: User must be logged in
     if (!currentUser || !account) {
       console.error('❌ Validation failed: No current user or account');
       toast.error('Please connect your wallet to follow users');
       return;
     }
+
+    // Validation 2: Target user must have a wallet address
+    if (!userToFollow.walletAddress) {
+      console.error('❌ CRITICAL ERROR: userToFollow.walletAddress is undefined!');
+      console.error('   Full userToFollow object:', JSON.stringify(userToFollow, null, 2));
+      toast.error('Cannot follow: User wallet address is missing');
+      return;
+    }
+
+    // Validation 3: Cannot follow yourself
+    if (userToFollow.walletAddress.toLowerCase() === account.toLowerCase()) {
+      console.error('❌ Validation failed: Cannot follow yourself');
+      toast.error('You cannot follow yourself');
+      return;
+    }
+
+    console.log('✅ All validations passed');
 
     try {
       setFollowLoading(prev => new Set([...prev, userToFollow.id]));
