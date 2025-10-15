@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { SupabaseService } from '../services/supabaseService';
@@ -8,6 +9,7 @@ import { followUser, unfollowUser, getFollowing } from '../services/followServic
 const SuggestedProfiles = () => {
   const { user: currentUser, account, getMediaUrl } = useWeb3();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [suggestedUsers, setSuggestedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [followingUsers, setFollowingUsers] = useState(new Set());
@@ -276,9 +278,12 @@ const SuggestedProfiles = () => {
           </div>
         ) : (
           suggestedUsers.map(user => (
-            <div key={user.id} className="flex items-center space-x-3">
-              {/* Avatar */}
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+            <div key={user.id} className="flex items-center space-x-3 group">
+              {/* Avatar - Clickable */}
+              <div
+                onClick={() => navigate(`/profile/${user.walletAddress}`)}
+                className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+              >
                 {user.avatarHash && getMediaUrl(user.avatarHash) ? (
                   <img
                     src={getMediaUrl(user.avatarHash)}
@@ -292,10 +297,13 @@ const SuggestedProfiles = () => {
                 )}
               </div>
 
-              {/* User Info */}
-              <div className="flex-1 min-w-0">
+              {/* User Info - Clickable */}
+              <div
+                onClick={() => navigate(`/profile/${user.walletAddress}`)}
+                className="flex-1 min-w-0 cursor-pointer"
+              >
                 <div className="flex items-center space-x-1">
-                  <h4 className="text-sm font-semibold text-gray-900 truncate">
+                  <h4 className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
                     {user.username}
                   </h4>
                   {user.isCreator && (
@@ -311,7 +319,10 @@ const SuggestedProfiles = () => {
 
               {/* Follow Button */}
               <button
-                onClick={() => handleFollow(user)}
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent navigation when clicking follow button
+                  handleFollow(user);
+                }}
                 disabled={followLoading.has(user.id)}
                 className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
                   followingUsers.has(user.id)

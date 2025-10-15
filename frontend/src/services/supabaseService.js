@@ -508,48 +508,12 @@ export class SupabaseService {
 
       console.log('✅ INSERT riuscito!');
 
-      // Update follower count for followed user
-      console.log('🔍 STEP 3: Aggiorno contatore followers...');
-      const { data: followedUser, error: fetchError } = await supabase
-        .from('users')
-        .select('followers_count')
-        .eq('wallet_address', followedAddress.toLowerCase())
-        .single();
+      // Update follow counts using the new centralized function
+      console.log('🔍 STEP 3: Aggiorno contatori follow...');
+      const countsResult = await this.updateFollowCounts(followerAddress, followedAddress);
 
-      console.log('📬 Utente seguito trovato:', followedUser);
-
-      if (!fetchError && followedUser) {
-        const newFollowersCount = (followedUser.followers_count || 0) + 1;
-        console.log('📝 Aggiorno followers_count a:', newFollowersCount);
-
-        await supabase
-          .from('users')
-          .update({ followers_count: newFollowersCount })
-          .eq('wallet_address', followedAddress.toLowerCase());
-      } else if (fetchError) {
-        console.warn('⚠️ Errore fetch utente seguito:', fetchError);
-      }
-
-      // Update following count for follower user
-      console.log('🔍 STEP 4: Aggiorno contatore following...');
-      const { data: followerUser, error: followerFetchError } = await supabase
-        .from('users')
-        .select('following_count')
-        .eq('wallet_address', followerAddress.toLowerCase())
-        .single();
-
-      console.log('📬 Utente follower trovato:', followerUser);
-
-      if (!followerFetchError && followerUser) {
-        const newFollowingCount = (followerUser.following_count || 0) + 1;
-        console.log('📝 Aggiorno following_count a:', newFollowingCount);
-
-        await supabase
-          .from('users')
-          .update({ following_count: newFollowingCount })
-          .eq('wallet_address', followerAddress.toLowerCase());
-      } else if (followerFetchError) {
-        console.warn('⚠️ Errore fetch utente follower:', followerFetchError);
+      if (!countsResult.success) {
+        console.warn('⚠️ Failed to update counts, but follow was successful');
       }
 
       console.log('✅ Successfully followed user');
@@ -575,37 +539,19 @@ export class SupabaseService {
       const { error: deleteError } = await supabase
         .from('follows')
         .delete()
-        .eq('follower_address', followerAddress)
-        .eq('followed_address', followedAddress);
+        .eq('follower_address', followerAddress.toLowerCase())
+        .eq('followed_address', followedAddress.toLowerCase());
 
       if (deleteError) throw deleteError;
 
-      // Update follower count for followed user
-      const { data: followedUser, error: fetchError } = await supabase
-        .from('users')
-        .select('followers_count')
-        .eq('wallet_address', followedAddress)
-        .single();
+      console.log('✅ DELETE successful');
 
-      if (!fetchError && followedUser) {
-        await supabase
-          .from('users')
-          .update({ followers_count: Math.max(0, (followedUser.followers_count || 0) - 1) })
-          .eq('wallet_address', followedAddress);
-      }
+      // Update follow counts using the new centralized function
+      console.log('🔍 Updating follow counts...');
+      const countsResult = await this.updateFollowCounts(followerAddress, followedAddress);
 
-      // Update following count for follower user
-      const { data: followerUser, error: followerFetchError } = await supabase
-        .from('users')
-        .select('following_count')
-        .eq('wallet_address', followerAddress)
-        .single();
-
-      if (!followerFetchError && followerUser) {
-        await supabase
-          .from('users')
-          .update({ following_count: Math.max(0, (followerUser.following_count || 0) - 1) })
-          .eq('wallet_address', followerAddress);
+      if (!countsResult.success) {
+        console.warn('⚠️ Failed to update counts, but unfollow was successful');
       }
 
       console.log('✅ Successfully unfollowed user');
@@ -662,6 +608,76 @@ export class SupabaseService {
       return { success: true, data: data.map(f => f.followed_address) };
     } catch (error) {
       console.error('❌ Error fetching following:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Update follow counts for users after follow/unfollow
+  static async updateFollowCounts(followerAddress, followedAddress) {
+    try {
+      console.log('🔄 [SupabaseService] Updating follow counts...');
+      console.log('   - Follower:', followerAddress);
+      console.log('   - Followed:', followedAddress);
+
+      // Count followers of the followed user
+      const { count: followersCount, error: followersError } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('followed_address', followedAddress.toLowerCase());
+
+      if (followersError) {
+        console.error('❌ Error counting followers:', followersError);
+        throw followersError;
+      }
+
+      // Count following of the follower user
+      const { count: followingCount, error: followingError } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_address', followerAddress.toLowerCase());
+
+      if (followingError) {
+        console.error('❌ Error counting following:', followingError);
+        throw followingError;
+      }
+
+      console.log('📊 [SupabaseService] Counts calculated:', {
+        followersCount: followersCount || 0,
+        followingCount: followingCount || 0
+      });
+
+      // Update followers_count for followed user
+      const { error: updateFollowedError } = await supabase
+        .from('users')
+        .update({ followers_count: followersCount || 0 })
+        .eq('wallet_address', followedAddress.toLowerCase());
+
+      if (updateFollowedError) {
+        console.error('❌ Error updating followed user count:', updateFollowedError);
+        throw updateFollowedError;
+      }
+
+      // Update following_count for follower user
+      const { error: updateFollowerError } = await supabase
+        .from('users')
+        .update({ following_count: followingCount || 0 })
+        .eq('wallet_address', followerAddress.toLowerCase());
+
+      if (updateFollowerError) {
+        console.error('❌ Error updating follower user count:', updateFollowerError);
+        throw updateFollowerError;
+      }
+
+      console.log('✅ [SupabaseService] Follow counts updated successfully');
+      return {
+        success: true,
+        counts: {
+          followersCount: followersCount || 0,
+          followingCount: followingCount || 0
+        }
+      };
+    } catch (error) {
+      console.error('❌ [SupabaseService] Error updating follow counts:', error);
       return { success: false, error: error.message };
     }
   }

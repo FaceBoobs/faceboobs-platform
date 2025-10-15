@@ -69,6 +69,23 @@ const Profile = () => {
         };
       }
 
+      // Load follow counts from Supabase (more accurate than blockchain)
+      let followCounts = { followersCount: 0, followingCount: 0 };
+      try {
+        console.log('🔍 [Profile] Loading follow counts from Supabase for:', profileAddress);
+        const userFromDB = await SupabaseService.getUser(profileAddress);
+
+        if (userFromDB.success && userFromDB.data) {
+          followCounts = {
+            followersCount: userFromDB.data.followers_count || 0,
+            followingCount: userFromDB.data.following_count || 0
+          };
+          console.log('✅ [Profile] Follow counts from Supabase:', followCounts);
+        }
+      } catch (error) {
+        console.warn('⚠️ [Profile] Could not load follow counts from Supabase:', error);
+      }
+
       if (userData) {
         setProfileData({
           address: profileAddress,
@@ -76,8 +93,8 @@ const Profile = () => {
           bio: userData.bio,
           avatarHash: userData.avatarHash,
           isCreator: userData.isCreator,
-          followersCount: Number(userData.followersCount || 0),
-          followingCount: Number(userData.followingCount || 0),
+          followersCount: followCounts.followersCount,  // Use Supabase counts
+          followingCount: followCounts.followingCount,  // Use Supabase counts
           totalEarnings: userData.totalEarnings || '0'
         });
       }
