@@ -9,24 +9,55 @@ import { SupabaseService } from './supabaseService';
  * @returns {Promise<{success: boolean, action?: string, error?: string}>}
  */
 export const followUser = async (followerAddress, followedAddress) => {
-  try {
-    console.log('🔄 followService.followUser:', { followerAddress, followedAddress });
+  console.log('');
+  console.log('═══════════════════════════════════════');
+  console.log('🔵 followService.followUser CHIAMATA');
+  console.log('═══════════════════════════════════════');
+  console.log('📊 Parametri ricevuti:');
+  console.log('   - followerAddress:', followerAddress);
+  console.log('   - followedAddress:', followedAddress);
+  console.log('   - followerType:', typeof followerAddress);
+  console.log('   - followedType:', typeof followedAddress);
 
+  try {
+    // Validazione parametri
     if (!followerAddress || !followedAddress) {
+      console.error('❌ VALIDAZIONE FALLITA: Indirizzi mancanti');
+      console.log('═══════════════════════════════════════');
       return { success: false, error: 'Follower and followed addresses are required' };
     }
 
+    if (followerAddress === followedAddress) {
+      console.error('❌ VALIDAZIONE FALLITA: Non puoi seguire te stesso');
+      console.log('═══════════════════════════════════════');
+      return { success: false, error: 'Cannot follow yourself' };
+    }
+
+    console.log('✅ Validazione parametri OK');
+    console.log('📞 Chiamando SupabaseService.followUser...');
+
     const result = await SupabaseService.followUser(followerAddress, followedAddress);
+
+    console.log('📬 Risposta da SupabaseService:');
+    console.log('   - success:', result.success);
+    console.log('   - action:', result.action);
+    console.log('   - error:', result.error || 'none');
+    console.log('   - data:', result.data || 'none');
 
     if (result.success) {
       console.log('✅ Follow successful:', result.action);
+      console.log('═══════════════════════════════════════');
     } else {
       console.error('❌ Follow failed:', result.error);
+      console.log('═══════════════════════════════════════');
     }
 
     return result;
   } catch (error) {
-    console.error('❌ Error in followService.followUser:', error);
+    console.error('❌ ERRORE CATCH in followService.followUser:');
+    console.error('   - Message:', error.message);
+    console.error('   - Stack:', error.stack);
+    console.log('═══════════════════════════════════════');
     return { success: false, error: error.message };
   }
 };

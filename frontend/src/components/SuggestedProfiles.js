@@ -3,6 +3,7 @@ import { UserPlus, RefreshCw } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { SupabaseService } from '../services/supabaseService';
+import { followUser, unfollowUser, getFollowing } from '../services/followService';
 
 const SuggestedProfiles = () => {
   const { user: currentUser, account, getMediaUrl } = useWeb3();
@@ -58,7 +59,18 @@ const SuggestedProfiles = () => {
 
   // Handle follow/unfollow
   const handleFollow = async (userToFollow) => {
+    console.log('');
+    console.log('╔══════════════════════════════════════════╗');
+    console.log('║  SuggestedProfiles.handleFollow CLICK    ║');
+    console.log('╚══════════════════════════════════════════╝');
+    console.log('📊 Current state:');
+    console.log('   - currentUser:', currentUser?.username, currentUser?.address);
+    console.log('   - account:', account);
+    console.log('   - userToFollow:', userToFollow.username, userToFollow.walletAddress);
+    console.log('   - userToFollow.id:', userToFollow.id);
+
     if (!currentUser || !account) {
+      console.error('❌ Validation failed: No current user or account');
       toast.error('Please connect your wallet to follow users');
       return;
     }
@@ -67,30 +79,95 @@ const SuggestedProfiles = () => {
       setFollowLoading(prev => new Set([...prev, userToFollow.id]));
 
       const isCurrentlyFollowing = followingUsers.has(userToFollow.id);
+      console.log('📊 isCurrentlyFollowing:', isCurrentlyFollowing);
 
       if (isCurrentlyFollowing) {
-        // Unfollow logic (placeholder - implement when follow system is ready)
-        setFollowingUsers(prev => {
-          const updated = new Set(prev);
-          updated.delete(userToFollow.id);
-          return updated;
-        });
-        toast.success(`Unfollowed ${userToFollow.username}`);
+        // Unfollow
+        console.log('🔄 Calling unfollowUser...');
+        console.log('   - From:', account);
+        console.log('   - To:', userToFollow.walletAddress);
+
+        const result = await unfollowUser(account, userToFollow.walletAddress);
+
+        console.log('📬 unfollowUser result:', result);
+
+        if (result.success) {
+          setFollowingUsers(prev => {
+            const updated = new Set(prev);
+            updated.delete(userToFollow.id);
+            return updated;
+          });
+          toast.success(`Unfollowed ${userToFollow.username}`);
+          console.log('✅ Unfollow UI updated');
+        } else {
+          console.error('❌ Unfollow failed:', result.error);
+          toast.error(`Failed to unfollow: ${result.error}`);
+        }
       } else {
-        // Follow logic (placeholder - implement when follow system is ready)
-        setFollowingUsers(prev => new Set([...prev, userToFollow.id]));
-        toast.success(`Following ${userToFollow.username}`);
+        // Follow
+        console.log('🔄 Calling followUser...');
+        console.log('   - From (follower):', account);
+        console.log('   - To (followed):', userToFollow.walletAddress);
+
+        const result = await followUser(account, userToFollow.walletAddress);
+
+        console.log('📬 followUser result:', result);
+
+        if (result.success) {
+          setFollowingUsers(prev => new Set([...prev, userToFollow.id]));
+          toast.success(`Following ${userToFollow.username}`);
+          console.log('✅ Follow UI updated');
+
+          // Trigger refresh event so Home page updates
+          window.dispatchEvent(new CustomEvent('refreshFeed'));
+          console.log('📡 Sent refreshFeed event');
+        } else {
+          console.error('❌ Follow failed:', result.error);
+          toast.error(`Failed to follow: ${result.error}`);
+        }
       }
 
     } catch (error) {
-      console.error('Error following user:', error);
-      toast.error('Failed to follow user');
+      console.error('❌ CATCH Error in handleFollow:');
+      console.error('   - Message:', error.message);
+      console.error('   - Stack:', error.stack);
+      toast.error('Failed to follow user: ' + error.message);
     } finally {
       setFollowLoading(prev => {
         const updated = new Set(prev);
         updated.delete(userToFollow.id);
         return updated;
       });
+      console.log('╚══════════════════════════════════════════╝');
+    }
+  };
+
+  // Load current user's following list
+  const loadFollowingStatus = async () => {
+    if (!account) return;
+
+    try {
+      console.log('🔍 [SuggestedProfiles] Loading following status for:', account);
+      const result = await getFollowing(account);
+
+      if (result.success && result.data) {
+        console.log('✅ [SuggestedProfiles] Following data:', result.data);
+        // result.data is array of addresses being followed
+        const followedAddresses = new Set(result.data);
+
+        // Map addresses to user IDs
+        const followedIds = new Set();
+        suggestedUsers.forEach(user => {
+          if (followedAddresses.has(user.walletAddress?.toLowerCase())) {
+            followedIds.add(user.id);
+          }
+        });
+
+        setFollowingUsers(followedIds);
+        console.log('✅ [SuggestedProfiles] Following IDs set:', Array.from(followedIds));
+      }
+    } catch (error) {
+      console.error('❌ [SuggestedProfiles] Error loading following status:', error);
     }
   };
 
@@ -98,6 +175,13 @@ const SuggestedProfiles = () => {
   useEffect(() => {
     loadSuggestedProfiles();
   }, [account]);
+
+  // Load following status when suggested users change
+  useEffect(() => {
+    if (suggestedUsers.length > 0) {
+      loadFollowingStatus();
+    }
+  }, [suggestedUsers, account]);
 
   if (!currentUser || loading) {
     return (

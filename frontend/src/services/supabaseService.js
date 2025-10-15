@@ -439,68 +439,130 @@ export class SupabaseService {
 
   // Follows
   static async followUser(followerAddress, followedAddress) {
+    console.log('');
+    console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+    console.log('🔵 SupabaseService.followUser CHIAMATA');
+    console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+
     try {
-      console.log('🔄 Following user:', followerAddress, '->', followedAddress);
+      console.log('📊 Parametri:');
+      console.log('   - followerAddress:', followerAddress);
+      console.log('   - followedAddress:', followedAddress);
+      console.log('   - followerLowercase:', followerAddress.toLowerCase());
+      console.log('   - followedLowercase:', followedAddress.toLowerCase());
 
       // Check if already following
+      console.log('🔍 STEP 1: Controllo se già seguito...');
       const { data: existingFollow, error: checkError } = await supabase
         .from('follows')
         .select('id')
-        .eq('follower_address', followerAddress)
-        .eq('followed_address', followedAddress)
+        .eq('follower_address', followerAddress.toLowerCase())
+        .eq('followed_address', followedAddress.toLowerCase())
         .single();
 
+      console.log('📬 Risultato controllo esistente:');
+      console.log('   - data:', existingFollow);
+      console.log('   - error:', checkError);
+      console.log('   - errorCode:', checkError?.code);
+
       if (checkError && checkError.code !== 'PGRST116') {
+        console.error('❌ ERRORE nel controllo follow esistente:', checkError);
         throw checkError;
       }
 
       if (existingFollow) {
         console.log('⚠️ Already following this user');
+        console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
         return { success: true, action: 'already_following' };
       }
 
+      console.log('✅ Non ancora seguito, procedo con INSERT');
+
       // Insert follow relationship
-      const { error: insertError } = await supabase
+      console.log('🔍 STEP 2: INSERT nella tabella follows...');
+      console.log('📝 Dati da inserire:', {
+        follower_address: followerAddress.toLowerCase(),
+        followed_address: followedAddress.toLowerCase()
+      });
+
+      const { data: insertData, error: insertError } = await supabase
         .from('follows')
         .insert([{
-          follower_address: followerAddress,
-          followed_address: followedAddress
-        }]);
+          follower_address: followerAddress.toLowerCase(),
+          followed_address: followedAddress.toLowerCase()
+        }])
+        .select(); // Aggiungo .select() per vedere i dati inseriti
 
-      if (insertError) throw insertError;
+      console.log('📬 Risultato INSERT:');
+      console.log('   - data:', insertData);
+      console.log('   - error:', insertError);
+
+      if (insertError) {
+        console.error('❌ ERRORE INSERT:', insertError);
+        console.error('   - Message:', insertError.message);
+        console.error('   - Code:', insertError.code);
+        console.error('   - Details:', insertError.details);
+        console.error('   - Hint:', insertError.hint);
+        throw insertError;
+      }
+
+      console.log('✅ INSERT riuscito!');
 
       // Update follower count for followed user
+      console.log('🔍 STEP 3: Aggiorno contatore followers...');
       const { data: followedUser, error: fetchError } = await supabase
         .from('users')
         .select('followers_count')
-        .eq('wallet_address', followedAddress)
+        .eq('wallet_address', followedAddress.toLowerCase())
         .single();
 
+      console.log('📬 Utente seguito trovato:', followedUser);
+
       if (!fetchError && followedUser) {
+        const newFollowersCount = (followedUser.followers_count || 0) + 1;
+        console.log('📝 Aggiorno followers_count a:', newFollowersCount);
+
         await supabase
           .from('users')
-          .update({ followers_count: (followedUser.followers_count || 0) + 1 })
-          .eq('wallet_address', followedAddress);
+          .update({ followers_count: newFollowersCount })
+          .eq('wallet_address', followedAddress.toLowerCase());
+      } else if (fetchError) {
+        console.warn('⚠️ Errore fetch utente seguito:', fetchError);
       }
 
       // Update following count for follower user
+      console.log('🔍 STEP 4: Aggiorno contatore following...');
       const { data: followerUser, error: followerFetchError } = await supabase
         .from('users')
         .select('following_count')
-        .eq('wallet_address', followerAddress)
+        .eq('wallet_address', followerAddress.toLowerCase())
         .single();
 
+      console.log('📬 Utente follower trovato:', followerUser);
+
       if (!followerFetchError && followerUser) {
+        const newFollowingCount = (followerUser.following_count || 0) + 1;
+        console.log('📝 Aggiorno following_count a:', newFollowingCount);
+
         await supabase
           .from('users')
-          .update({ following_count: (followerUser.following_count || 0) + 1 })
-          .eq('wallet_address', followerAddress);
+          .update({ following_count: newFollowingCount })
+          .eq('wallet_address', followerAddress.toLowerCase());
+      } else if (followerFetchError) {
+        console.warn('⚠️ Errore fetch utente follower:', followerFetchError);
       }
 
       console.log('✅ Successfully followed user');
-      return { success: true, action: 'followed' };
+      console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+      return { success: true, action: 'followed', data: insertData };
     } catch (error) {
-      console.error('❌ Error following user:', error);
+      console.error('❌ ERRORE CATCH in SupabaseService.followUser:');
+      console.error('   - Message:', error.message);
+      console.error('   - Code:', error.code);
+      console.error('   - Details:', error.details);
+      console.error('   - Hint:', error.hint);
+      console.error('   - Stack:', error.stack);
+      console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
       return { success: false, error: error.message };
     }
   }
