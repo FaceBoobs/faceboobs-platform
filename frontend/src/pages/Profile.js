@@ -45,59 +45,83 @@ const Profile = () => {
   const loadProfileData = async () => {
     try {
       setLoading(true);
+      console.log('🔵 [Profile] Loading profile for address:', profileAddress);
+      console.log('🔵 [Profile] Is own profile:', isOwnProfile);
 
-      // Load user profile data from blockchain (if available) or fallback to user data
-      let userData;
-      if (contract) {
-        try {
-          userData = await contract.getUser(profileAddress);
-        } catch (error) {
-          console.log('Contract not available, using current user data');
-        }
-      }
+      // ALWAYS load from Supabase first (primary source of truth)
+      let userData = null;
 
-      // Use current user data as fallback or if blockchain is not available
-      if (!userData && isOwnProfile && user) {
-        userData = {
-          username: user.username || 'Anonymous User',
-          bio: user.bio || '',
-          avatarHash: user.profileImage || '',
-          isCreator: user.isCreator || false,
-          followersCount: 0,
-          followingCount: 0,
-          totalEarnings: '0'
-        };
-      }
-
-      // Load follow counts from Supabase (more accurate than blockchain)
-      let followCounts = { followersCount: 0, followingCount: 0 };
       try {
-        console.log('🔍 [Profile] Loading follow counts from Supabase for:', profileAddress);
+        console.log('🔍 [Profile] Querying Supabase for user:', profileAddress);
         const userFromDB = await SupabaseService.getUser(profileAddress);
 
+        console.log('📬 [Profile] Supabase query result:', {
+          success: userFromDB.success,
+          hasData: !!userFromDB.data,
+          error: userFromDB.error
+        });
+
         if (userFromDB.success && userFromDB.data) {
-          followCounts = {
+          console.log('✅ [Profile] User found in Supabase:', userFromDB.data);
+
+          userData = {
+            username: userFromDB.data.username || 'Anonymous User',
+            bio: userFromDB.data.bio || '',
+            avatarHash: userFromDB.data.avatar_hash || '',
+            isCreator: userFromDB.data.is_creator || false,
             followersCount: userFromDB.data.followers_count || 0,
-            followingCount: userFromDB.data.following_count || 0
+            followingCount: userFromDB.data.following_count || 0,
+            totalEarnings: '0' // TODO: load from blockchain or Supabase
           };
-          console.log('✅ [Profile] Follow counts from Supabase:', followCounts);
+        } else {
+          console.warn('⚠️ [Profile] User not found in Supabase');
+
+          // Fallback: if it's own profile and we have cached user data
+          if (isOwnProfile && user) {
+            console.log('🔄 [Profile] Using fallback for own profile from context');
+            userData = {
+              username: user.username || 'Anonymous User',
+              bio: user.bio || '',
+              avatarHash: user.profileImage || '',
+              isCreator: user.isCreator || false,
+              followersCount: 0,
+              followingCount: 0,
+              totalEarnings: '0'
+            };
+          }
         }
       } catch (error) {
-        console.warn('⚠️ [Profile] Could not load follow counts from Supabase:', error);
+        console.error('❌ [Profile] Error loading from Supabase:', error);
+
+        // Fallback for own profile
+        if (isOwnProfile && user) {
+          console.log('🔄 [Profile] Using fallback after error');
+          userData = {
+            username: user.username || 'Anonymous User',
+            bio: user.bio || '',
+            avatarHash: user.profileImage || '',
+            isCreator: user.isCreator || false,
+            followersCount: 0,
+            followingCount: 0,
+            totalEarnings: '0'
+          };
+        }
       }
 
-      if (userData) {
-        setProfileData({
-          address: profileAddress,
-          username: userData.username,
-          bio: userData.bio,
-          avatarHash: userData.avatarHash,
-          isCreator: userData.isCreator,
-          followersCount: followCounts.followersCount,  // Use Supabase counts
-          followingCount: followCounts.followingCount,  // Use Supabase counts
-          totalEarnings: userData.totalEarnings || '0'
-        });
+      // If still no userData, profile not found
+      if (!userData) {
+        console.error('❌ [Profile] No user data available - profile not found');
+        setProfileData(null);
+        setLoading(false);
+        return;
       }
+
+      // Set profile data
+      console.log('✅ [Profile] Setting profile data:', userData);
+      setProfileData({
+        address: profileAddress,
+        ...userData
+      });
 
       // Load posts from Supabase using the new schema
       console.log('🔄 Loading user posts from Supabase...');

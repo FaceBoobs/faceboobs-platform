@@ -407,16 +407,36 @@ export class SupabaseService {
 
   static async getUser(address) {
     try {
+      console.log('🔍 [SupabaseService.getUser] Querying for address:', address);
+      console.log('   - Normalized (lowercase):', address?.toLowerCase());
+
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('wallet_address', address)
+        .eq('wallet_address', address?.toLowerCase()) // SEMPRE usa toLowerCase
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      console.log('📬 [SupabaseService.getUser] Query result:', {
+        found: !!data,
+        error: error?.code,
+        errorMessage: error?.message
+      });
+
+      // PGRST116 = "not found" - non è un errore critico
+      if (error && error.code !== 'PGRST116') {
+        console.error('❌ [SupabaseService.getUser] Critical error:', error);
+        throw error;
+      }
+
+      if (data) {
+        console.log('✅ [SupabaseService.getUser] User found:', data.username);
+      } else {
+        console.log('⚠️ [SupabaseService.getUser] User not found');
+      }
+
       return { success: true, data };
     } catch (error) {
-      console.error('Error fetching user:', error);
+      console.error('❌ [SupabaseService.getUser] Error fetching user:', error);
       return { success: false, error: error.message };
     }
   }
