@@ -667,25 +667,53 @@ export class SupabaseService {
       });
 
       // Update followers_count for followed user
-      const { error: updateFollowedError } = await supabase
+      console.log('🔍 [SupabaseService] UPDATE 1: Updating followers_count for:', followedAddress.toLowerCase());
+      console.log('   - Setting followers_count to:', followersCount || 0);
+
+      const { data: followedUpdateData, error: updateFollowedError, count: followedUpdateCount } = await supabase
         .from('users')
         .update({ followers_count: followersCount || 0 })
-        .eq('wallet_address', followedAddress.toLowerCase());
+        .eq('wallet_address', followedAddress.toLowerCase())
+        .select(); // Add select() to see what was updated
+
+      console.log('📬 [SupabaseService] UPDATE 1 Result:');
+      console.log('   - Updated rows:', followedUpdateData?.length || 0);
+      console.log('   - Data:', followedUpdateData);
+      console.log('   - Error:', updateFollowedError);
 
       if (updateFollowedError) {
         console.error('❌ Error updating followed user count:', updateFollowedError);
         throw updateFollowedError;
       }
 
+      if (!followedUpdateData || followedUpdateData.length === 0) {
+        console.warn('⚠️ [SupabaseService] UPDATE 1: No rows updated for followed user!');
+        console.warn('   - This means the user', followedAddress.toLowerCase(), 'does NOT exist in users table');
+      }
+
       // Update following_count for follower user
-      const { error: updateFollowerError } = await supabase
+      console.log('🔍 [SupabaseService] UPDATE 2: Updating following_count for:', followerAddress.toLowerCase());
+      console.log('   - Setting following_count to:', followingCount || 0);
+
+      const { data: followerUpdateData, error: updateFollowerError } = await supabase
         .from('users')
         .update({ following_count: followingCount || 0 })
-        .eq('wallet_address', followerAddress.toLowerCase());
+        .eq('wallet_address', followerAddress.toLowerCase())
+        .select(); // Add select() to see what was updated
+
+      console.log('📬 [SupabaseService] UPDATE 2 Result:');
+      console.log('   - Updated rows:', followerUpdateData?.length || 0);
+      console.log('   - Data:', followerUpdateData);
+      console.log('   - Error:', updateFollowerError);
 
       if (updateFollowerError) {
         console.error('❌ Error updating follower user count:', updateFollowerError);
         throw updateFollowerError;
+      }
+
+      if (!followerUpdateData || followerUpdateData.length === 0) {
+        console.warn('⚠️ [SupabaseService] UPDATE 2: No rows updated for follower user!');
+        console.warn('   - This means the user', followerAddress.toLowerCase(), 'does NOT exist in users table');
       }
 
       console.log('✅ [SupabaseService] Follow counts updated successfully');
