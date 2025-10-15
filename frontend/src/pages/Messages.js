@@ -133,7 +133,17 @@ const Messages = () => {
 
         // Convert map to array and add user data
         const conversationsWithUserData = Array.from(conversationsMap.values()).map(conv => {
-          const otherUser = users.find(u => u.address === conv.address);
+          // Find user by wallet_address or address field
+          const otherUser = users.find(u => {
+            const userAddr = (u.wallet_address || u.address)?.toLowerCase();
+            return userAddr === conv.address?.toLowerCase();
+          });
+
+          console.log('🔍 Matching user for conversation:', {
+            convAddress: conv.address,
+            foundUser: otherUser?.username,
+            userAddress: otherUser?.wallet_address || otherUser?.address
+          });
 
           return {
             id: conv.address, // Use address as unique ID
@@ -241,17 +251,69 @@ const Messages = () => {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !activeChat || !account) return;
+
+    // Enhanced validation with detailed logging
+    console.log('');
+    console.log('╔══════════════════════════════════════════╗');
+    console.log('║  📤 SEND MESSAGE VALIDATION              ║');
+    console.log('╚══════════════════════════════════════════╝');
+    console.log('📊 Current state:');
+    console.log('   - newMessage:', newMessage);
+    console.log('   - newMessage.trim():', newMessage.trim());
+    console.log('   - activeChat:', activeChat);
+    console.log('   - activeChat.address:', activeChat?.address);
+    console.log('   - account:', account);
+
+    // Validation 1: Message content
+    if (!newMessage.trim()) {
+      console.error('❌ Validation failed: Message is empty');
+      return;
+    }
+
+    // Validation 2: Active chat selected
+    if (!activeChat) {
+      console.error('❌ Validation failed: No active chat selected');
+      toast.error('Please select a conversation first');
+      return;
+    }
+
+    // Validation 3: Current user account
+    if (!account) {
+      console.error('❌ Validation failed: User not logged in');
+      toast.error('Please connect your wallet');
+      return;
+    }
+
+    // Validation 4: Receiver address (CRITICAL)
+    if (!activeChat.address) {
+      console.error('❌ CRITICAL: activeChat.address is undefined!');
+      console.error('   Full activeChat object:', JSON.stringify(activeChat, null, 2));
+      toast.error('Cannot send message: Recipient address is missing');
+      return;
+    }
+
+    // Validation 5: Check if it's a demo conversation
+    if (activeChat.isDemoConversation) {
+      console.warn('⚠️ Cannot send message to demo conversation');
+      toast.error('This is a demo conversation. Start a real chat to send messages.');
+      return;
+    }
+
+    console.log('✅ All validations passed');
 
     try {
       setSendingMessage(true);
       console.log('📤 Sending message to:', activeChat.address);
+      console.log('📤 From:', account);
+      console.log('📤 Content:', newMessage.trim());
 
       const messageData = {
-        sender_address: account,
-        receiver_address: activeChat.address,
+        sender_address: account.toLowerCase(),
+        receiver_address: activeChat.address.toLowerCase(),
         content: newMessage.trim()
       };
+
+      console.log('📝 Message data prepared:', messageData);
 
       const result = await SupabaseService.sendMessage(messageData);
 
@@ -321,10 +383,27 @@ const Messages = () => {
       console.log('📦 getAllUsers result:', result);
 
       if (result.success) {
-        // Filter out current user
-        const users = result.data.filter(u => u.address !== account);
-        console.log('✅ Loaded users:', users.length, users);
-        setAvailableUsers(users);
+        // Filter out current user and users without valid addresses
+        const users = result.data.filter(u => {
+          const userAddress = u.wallet_address || u.address;
+          const hasValidAddress = userAddress && userAddress !== account?.toLowerCase();
+
+          if (!userAddress) {
+            console.warn('⚠️ User without address:', u);
+          }
+
+          return hasValidAddress;
+        });
+
+        // Transform users to ensure they have 'address' field for Messages component
+        const transformedUsers = users.map(u => ({
+          ...u,
+          address: u.wallet_address || u.address,
+          username: u.username || `User${(u.wallet_address || u.address)?.substring(0, 6)}`
+        }));
+
+        console.log('✅ Loaded users:', transformedUsers.length, transformedUsers);
+        setAvailableUsers(transformedUsers);
       } else {
         console.error('❌ Failed to load users:', result.error);
         toast.error('Failed to load users');
