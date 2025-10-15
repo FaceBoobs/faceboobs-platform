@@ -65,17 +65,39 @@ const Home = () => {
     try {
       console.log('📋 Loading following list for:', account);
 
-      if (!contract) {
-        console.log('⚠️ Contract not available yet');
+      if (!account) {
+        console.log('⚠️ Account not available yet');
         return;
       }
 
-      // Get the list of addresses the user is following from the smart contract
-      const following = await contract.getFollowing(account);
-      console.log('✅ User is following:', following.length, 'addresses', following);
+      // Get the list of addresses the user is following from Supabase database
+      console.log('🔄 Calling SupabaseService.getFollowing...');
+      const result = await SupabaseService.getFollowing(account);
 
-      setFollowingAddresses(following);
-      setHasFollows(following.length > 0);
+      if (result.success) {
+        console.log('✅ User is following:', result.data.length, 'addresses', result.data);
+        setFollowingAddresses(result.data);
+        setHasFollows(result.data.length > 0);
+      } else {
+        console.error('❌ Failed to load following list:', result.error);
+        setFollowingAddresses([]);
+        setHasFollows(false);
+      }
+
+      // Optionally sync with blockchain if contract is available
+      if (contract && contract.getFollowing) {
+        try {
+          const blockchainFollowing = await contract.getFollowing(account);
+          console.log('🔗 Blockchain following:', blockchainFollowing.length, 'addresses');
+
+          // You can compare and sync here if needed
+          if (blockchainFollowing.length !== result.data?.length) {
+            console.warn('⚠️ Blockchain and database following lists differ!');
+          }
+        } catch (blockchainError) {
+          console.warn('⚠️ Blockchain sync failed (using database only):', blockchainError);
+        }
+      }
     } catch (error) {
       console.error('❌ Error loading following list:', error);
       setFollowingAddresses([]);
