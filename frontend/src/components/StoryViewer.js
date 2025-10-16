@@ -178,7 +178,7 @@ const StoryViewer = ({ stories, initialIndex, isOpen, onClose }) => {
                 />
               ) : (
                 <span className="text-pink-800 font-semibold text-sm">
-                  {currentStory.creatorData.username.charAt(0).toUpperCase()}
+                  {(currentStory.creatorData?.username || 'U').charAt(0).toUpperCase()}
                 </span>
               )}
             </div>

@@ -405,7 +405,7 @@ const Home = () => {
                 />
               ) : (
                 <span className="text-pink-800 font-semibold">
-                  {content.creatorData.username.charAt(0).toUpperCase()}
+                  {(content.creatorData?.username || 'U').charAt(0).toUpperCase()}
                 </span>
               )}
             </div>
@@ -555,12 +555,12 @@ const Home = () => {
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center">
                 <span className="text-pink-800 text-sm font-semibold">
-                  {selectedStory.creatorData.username.charAt(0).toUpperCase()}
+                  {(selectedStory.creatorData?.username || 'U').charAt(0).toUpperCase()}
                 </span>
               </div>
               <div>
                 <p className="text-pink-800 font-semibold text-sm">
-                  {selectedStory.creatorData.username}
+                  {selectedStory.creatorData?.username || 'Unknown'}
                 </p>
                 <p className="text-gray-300 text-xs">
                   {formatTimeAgo(selectedStory.timestamp)}

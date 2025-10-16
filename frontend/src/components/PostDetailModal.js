@@ -228,27 +228,33 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {contentComments.map((comment) => (
-                    <div key={comment.id} className="flex space-x-3">
-                      <div className="w-7 h-7 bg-gradient-to-r from-green-500 to-teal-500 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-white text-xs font-semibold">
-                          {comment.author.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm">
-                          <span className="font-semibold text-gray-900 mr-2">{comment.author}</span>
-                          <span className="text-gray-800">{comment.text}</span>
+                  {contentComments.map((comment) => {
+                    // Safe fallback for username/author
+                    const displayName = comment.author || comment.username || comment.user_address?.slice(0, 8) || 'Anonymous';
+                    const avatarLetter = displayName.charAt(0).toUpperCase();
+
+                    return (
+                      <div key={comment.id} className="flex space-x-3">
+                        <div className="w-7 h-7 bg-gradient-to-r from-green-500 to-teal-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs font-semibold">
+                            {avatarLetter}
+                          </span>
                         </div>
-                        <div className="flex items-center space-x-4 mt-1">
-                          <span className="text-xs text-gray-500">{formatTimeAgo(comment.timestamp)}</span>
-                          <button className="text-xs text-gray-600 font-semibold hover:text-gray-800">
-                            Reply
-                          </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm">
+                            <span className="font-semibold text-gray-900 mr-2">{displayName}</span>
+                            <span className="text-gray-800">{comment.text || comment.content || ''}</span>
+                          </div>
+                          <div className="flex items-center space-x-4 mt-1">
+                            <span className="text-xs text-gray-500">{formatTimeAgo(comment.timestamp)}</span>
+                            <button className="text-xs text-gray-600 font-semibold hover:text-gray-800">
+                              Reply
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
