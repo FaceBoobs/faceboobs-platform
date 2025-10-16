@@ -41,8 +41,7 @@ const Home = () => {
 
   useEffect(() => {
     if (account) {
-      loadFollowingList();
-      loadFeedData();
+      loadFollowingAndFeed();
       loadStoriesData();
     }
   }, [account]);
@@ -52,8 +51,7 @@ const Home = () => {
     const handleRefreshFeed = () => {
       console.log('Refresh feed requested');
       if (account) {
-        loadFollowingList();
-        loadFeedData();
+        loadFollowingAndFeed();
         loadStoriesData();
       }
     };
@@ -62,74 +60,56 @@ const Home = () => {
     return () => window.removeEventListener('refreshFeed', handleRefreshFeed);
   }, [account]);
 
-  const loadFollowingList = async () => {
+  // Combined function that loads following list AND immediately loads posts
+  const loadFollowingAndFeed = async () => {
     try {
-      console.log('📋 [Home] Loading following list for:', account);
+      setLoading(true);
+      console.log('🔵 [Home] Loading feed for:', account);
 
       if (!account) {
         console.log('⚠️ [Home] Account not available yet');
+        setLoading(false);
         return;
       }
 
-      // Get the list of addresses the user is following using followService
+      // 1. Load following list
       console.log('🔄 [Home] Calling getFollowing from followService...');
-      const result = await getFollowing(account);
+      const followingResult = await getFollowing(account);
 
-      if (result.success && result.data) {
-        // result.data is already an array of addresses from SupabaseService.getFollowing
-        const addresses = result.data; // Already processed by followService
-        console.log('✅ [Home] Following addresses loaded:', addresses.length, 'addresses');
-        console.log('📋 [Home] Following addresses:', addresses);
-
-        setFollowingAddresses(addresses);
-        setHasFollows(addresses.length > 0);
-      } else {
-        console.error('❌ [Home] Failed to load following list:', result.error);
+      if (!followingResult.success || !followingResult.data) {
+        console.error('❌ [Home] Failed to load following list:', followingResult.error);
         setFollowingAddresses([]);
         setHasFollows(false);
+        setContents([]);
+        setLoading(false);
+        return;
       }
 
-      // Optionally sync with blockchain if contract is available
-      if (contract && contract.getFollowing) {
-        try {
-          const blockchainFollowing = await contract.getFollowing(account);
-          console.log('🔗 [Home] Blockchain following:', blockchainFollowing.length, 'addresses');
+      const addresses = followingResult.data;
+      console.log('✅ [Home] Following addresses loaded:', addresses.length, 'addresses');
+      console.log('📋 [Home] Following addresses:', addresses);
 
-          // You can compare and sync here if needed
-          if (blockchainFollowing.length !== result.data?.length) {
-            console.warn('⚠️ [Home] Blockchain and database following lists differ!');
-          }
-        } catch (blockchainError) {
-          console.warn('⚠️ [Home] Blockchain sync failed (using database only):', blockchainError);
-        }
-      }
-    } catch (error) {
-      console.error('❌ [Home] Error loading following list:', error);
-      console.error('❌ [Home] Error details:', error.message, error.stack);
-      setFollowingAddresses([]);
-      setHasFollows(false);
-    }
-  };
-
-  const loadFeedData = async () => {
-    try {
-      setLoading(true);
-      console.log('📰 Loading following-only feed from Supabase...');
-      console.log('👥 Following addresses:', followingAddresses);
+      setFollowingAddresses(addresses);
+      setHasFollows(addresses.length > 0);
 
       // If user doesn't follow anyone, show empty feed
-      if (followingAddresses.length === 0) {
+      if (addresses.length === 0) {
         console.log('📭 User is not following anyone');
         setContents([]);
         setLoading(false);
         return;
       }
 
-      const result = await SupabaseService.getPostsByCreators(followingAddresses);
+      // 2. Load posts from followed users IMMEDIATELY
+      console.log('🔵 [Home] Loading posts from followed creators...');
+
+      const result = await SupabaseService.getPostsByCreators(addresses);
 
       if (!result.success) {
-        console.error('Error loading posts:', result.error);
+        console.error('❌ Error loading posts:', result.error);
         toast.error('Failed to load posts: ' + result.error);
+        setContents([]);
+        setLoading(false);
         return;
       }
 
@@ -164,9 +144,27 @@ const Home = () => {
         await initializeMultipleComments(contentIds);
       }
 
+      // Optionally sync with blockchain if contract is available
+      if (contract && contract.getFollowing) {
+        try {
+          const blockchainFollowing = await contract.getFollowing(account);
+          console.log('🔗 [Home] Blockchain following:', blockchainFollowing.length, 'addresses');
+
+          // You can compare and sync here if needed
+          if (blockchainFollowing.length !== addresses.length) {
+            console.warn('⚠️ [Home] Blockchain and database following lists differ!');
+          }
+        } catch (blockchainError) {
+          console.warn('⚠️ [Home] Blockchain sync failed (using database only):', blockchainError);
+        }
+      }
+
     } catch (error) {
-      console.error('Error loading feed:', error);
-      toast.error('Failed to load feed');
+      console.error('❌ [Home] Error loading feed:', error);
+      console.error('❌ [Home] Error details:', error.message, error.stack);
+      setFollowingAddresses([]);
+      setHasFollows(false);
+      setContents([]);
     } finally {
       setLoading(false);
     }
@@ -229,7 +227,7 @@ const Home = () => {
 
   const buyContent = async (contentId, price) => {
     console.log('Starting content purchase...', { contentId, price });
-    
+
     if (!contract) {
       toast.error('Contract not available. Please connect your wallet.');
       return;
@@ -243,10 +241,10 @@ const Home = () => {
     try {
       // For now, simulate purchase - in production you'd interact with smart contract
       toast.info('Purchase simulation - content unlocked!');
-      
+
       // Reload feed to show updated access
-      await loadFeedData();
-      
+      await loadFollowingAndFeed();
+
     } catch (error) {
       console.error('Purchase failed:', error);
       toast.error('Purchase failed: ' + error.message);
