@@ -614,10 +614,6 @@ const Messages = () => {
                   )}
                 </button>
               </form>
-              
-              <div className="mt-2 text-xs text-gray-500 text-center">
-                Messages are stored locally and not encrypted end-to-end
-              </div>
             </div>
           </>
         ) : (

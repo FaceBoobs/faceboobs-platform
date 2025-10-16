@@ -1,14 +1,16 @@
 // src/services/followService.js
 // Wrapper service per operazioni di follow che usa SupabaseService
 import { SupabaseService } from './supabaseService';
+import { createFollowNotification } from './notificationService';
 
 /**
  * Follow a user
  * @param {string} followerAddress - Address of the user doing the follow
  * @param {string} followedAddress - Address of the user being followed
+ * @param {string} followerUsername - Username of the follower (optional)
  * @returns {Promise<{success: boolean, action?: string, error?: string}>}
  */
-export const followUser = async (followerAddress, followedAddress) => {
+export const followUser = async (followerAddress, followedAddress, followerUsername = null) => {
   console.log('');
   console.log('═══════════════════════════════════════');
   console.log('🔵 followService.followUser CHIAMATA');
@@ -46,6 +48,19 @@ export const followUser = async (followerAddress, followedAddress) => {
 
     if (result.success) {
       console.log('✅ Follow successful:', result.action);
+
+      // Create notification for the followed user (only if it's a new follow, not already_following)
+      if (result.action === 'followed') {
+        console.log('🔔 Creating follow notification...');
+        try {
+          await createFollowNotification(followedAddress, followerAddress, followerUsername);
+          console.log('✅ Follow notification created');
+        } catch (notifError) {
+          console.error('⚠️ Failed to create notification (non-critical):', notifError);
+          // Don't fail the follow operation if notification fails
+        }
+      }
+
       console.log('═══════════════════════════════════════');
     } else {
       console.error('❌ Follow failed:', result.error);
