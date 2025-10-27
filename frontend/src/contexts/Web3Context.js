@@ -180,7 +180,7 @@ export const Web3Provider = ({ children }) => {
       setContractError(null);
 
       if (userAccount) {
-        await loadUserData(contractInstance, userAccount);
+        await loadUserData(userAccount);
       }
 
       console.log('✅ Contract initialized successfully');
@@ -192,33 +192,33 @@ export const Web3Provider = ({ children }) => {
     }
   };
 
-  const loadUserData = async (contractInstance, userAccount) => {
+  const loadUserData = async (userAccount) => {
     try {
-      const userData = await contractInstance.getUser(userAccount);
+      console.log('🔍 Loading user data from Supabase for:', userAccount);
 
-      if (userData.exists) {
+      // Load user data from Supabase ONLY
+      const { data: userData, success } = await SupabaseService.getUser(userAccount);
+
+      if (success && userData) {
+        // User exists in Supabase
         const userObj = {
           address: userAccount,
-          username: userData.username,
-          avatarHash: userData.avatarHash,
-          bio: userData.bio,
-          isCreator: userData.isCreator,
-          followersCount: Number(userData.followersCount),
-          followingCount: Number(userData.followingCount),
-          totalEarnings: userData.totalEarnings
+          username: userData.username || null,
+          avatarHash: userData.avatar_url || 'QmDefaultAvatar',
+          bio: userData.bio || '',
+          isCreator: userData.is_creator || false,
+          followersCount: userData.followers_count || 0,
+          followingCount: userData.following_count || 0,
+          totalEarnings: '0' // Earnings are only tracked on blockchain
         };
 
         setUser(userObj);
-        console.log('✅ User data loaded from blockchain');
-
-        // Sync with Supabase
-        await syncUserToSupabase(userObj);
+        console.log('✅ User data loaded from Supabase');
       } else {
-        setUser(null);
-        console.log('ℹ️ User not registered on blockchain');
-
-        // Check if user exists in Supabase (connected but not registered)
+        // User doesn't exist in Supabase - create them automatically
+        console.log('ℹ️ User not found in Supabase, creating new record...');
         await checkOrCreateSupabaseUser(userAccount);
+        setUser(null); // User is created but not registered yet
       }
     } catch (error) {
       console.error('❌ Error loading user data:', error);
@@ -260,35 +260,10 @@ export const Web3Provider = ({ children }) => {
     }
   };
 
-  const syncUserToSupabase = async (userObj) => {
-    try {
-      console.log('🔄 Syncing user data to Supabase...');
-
-      const supabaseData = {
-        wallet_address: userObj.address.toLowerCase(),
-        username: userObj.username || null,
-        bio: userObj.bio || null,
-        avatar_url: userObj.avatarHash !== 'QmDefaultAvatar' ? userObj.avatarHash : null,
-        is_creator: userObj.isCreator,
-        followers_count: userObj.followersCount,
-        following_count: userObj.followingCount
-      };
-
-      const result = await SupabaseService.createOrUpdateUser(supabaseData);
-
-      if (result.success) {
-        console.log('✅ User data synced to Supabase');
-      } else {
-        console.error('⚠️ Failed to sync user to Supabase:', result.error);
-      }
-    } catch (error) {
-      console.error('❌ Error syncing user to Supabase:', error);
-    }
-  };
 
   const registerUser = async (username, bio, avatarFile) => {
-    if (!contract) {
-      return { success: false, message: 'Contract not available. Please connect your wallet and ensure you\'re on BSC Testnet.' };
+    if (!account) {
+      return { success: false, message: 'Please connect your wallet first.' };
     }
 
     if (!username || username.trim() === '') {
@@ -303,12 +278,8 @@ export const Web3Provider = ({ children }) => {
         avatarHash = await uploadMedia(avatarFile);
       }
 
-      // Register user on blockchain
-      const tx = await contract.registerUser(username.trim(), avatarHash, bio || '');
-      await tx.wait();
-
-      // Save user to Supabase
-      console.log('📝 Preparando dati per Supabase...');
+      // Save user to Supabase ONLY (no blockchain call)
+      console.log('📝 Saving user data to Supabase...');
       console.log('Account address:', account);
       console.log('Username:', username.trim());
       console.log('Bio:', bio || '');
@@ -324,43 +295,34 @@ export const Web3Provider = ({ children }) => {
         following_count: 0
       };
 
-      console.log('📤 Dati da inserire in Supabase:', userData);
+      console.log('📤 Data to insert in Supabase:', userData);
 
-      const supabaseResult = await SupabaseService.createUser(userData);
+      const supabaseResult = await SupabaseService.createOrUpdateUser(userData);
 
       if (!supabaseResult.success) {
         console.error('❌ Failed to save user to Supabase:', supabaseResult.error);
         console.error('❌ Error details:', supabaseResult);
-      } else {
-        console.log('✅ User saved to Supabase successfully');
-        console.log('✅ Supabase response:', supabaseResult.data);
+        return { success: false, message: 'Failed to register user: ' + supabaseResult.error };
       }
 
-      await loadUserData(contract, account);
+      console.log('✅ User saved to Supabase successfully');
+      console.log('✅ Supabase response:', supabaseResult.data);
+
+      await loadUserData(account);
 
       return { success: true, message: 'Registration successful!' };
 
     } catch (error) {
       console.error('Registration error:', error);
-      let errorMessage = 'Registration failed: ';
-
-      if (error.message.includes('User already registered')) {
-        errorMessage += 'This address is already registered.';
-      } else if (error.message.includes('user rejected')) {
-        errorMessage += 'Transaction was rejected by user.';
-      } else {
-        errorMessage += error.message;
-      }
-
-      return { success: false, message: errorMessage };
+      return { success: false, message: 'Registration failed: ' + error.message };
     } finally {
       setLoading(false);
     }
   };
 
   const becomeCreator = async () => {
-    if (!contract) {
-      return { success: false, message: 'Contract not available. Please connect your wallet and ensure you\'re on BSC Testnet.' };
+    if (!account) {
+      return { success: false, message: 'Please connect your wallet first.' };
     }
 
     if (!user) {
@@ -374,11 +336,7 @@ export const Web3Provider = ({ children }) => {
     try {
       setLoading(true);
 
-      // Update blockchain
-      const tx = await contract.becomeCreator();
-      await tx.wait();
-
-      // Update Supabase
+      // Update Supabase ONLY (no blockchain call)
       console.log('📝 Updating is_creator in Supabase...');
       const supabaseUpdate = {
         wallet_address: account.toLowerCase(),
@@ -387,37 +345,29 @@ export const Web3Provider = ({ children }) => {
 
       const result = await SupabaseService.createOrUpdateUser(supabaseUpdate);
 
-      if (result.success) {
-        console.log('✅ is_creator updated in Supabase');
-      } else {
+      if (!result.success) {
         console.error('⚠️ Failed to update is_creator in Supabase:', result.error);
+        return { success: false, message: 'Failed to become creator: ' + result.error };
       }
 
+      console.log('✅ is_creator updated in Supabase');
+
       // Reload user data
-      await loadUserData(contract, account);
+      await loadUserData(account);
 
       return { success: true, message: 'Congratulations! You are now a creator!' };
 
     } catch (error) {
       console.error('❌ Become creator error:', error);
-
-      let errorMessage = 'Failed to become creator: ';
-
-      if (error.message.includes('user rejected')) {
-        errorMessage += 'Transaction was rejected by user.';
-      } else {
-        errorMessage += error.message;
-      }
-
-      return { success: false, message: errorMessage };
+      return { success: false, message: 'Failed to become creator: ' + error.message };
     } finally {
       setLoading(false);
     }
   };
 
   const updateProfile = async (username, bio, avatarFile) => {
-    if (!contract) {
-      return { success: false, message: 'Contract not available. Please connect your wallet and ensure you\'re on BSC Testnet.' };
+    if (!account) {
+      return { success: false, message: 'Please connect your wallet first.' };
     }
 
     if (!user) {
@@ -436,11 +386,7 @@ export const Web3Provider = ({ children }) => {
         avatarHash = await uploadMedia(avatarFile);
       }
 
-      // Update blockchain
-      const tx = await contract.updateProfile(username.trim(), avatarHash, bio || '');
-      await tx.wait();
-
-      // Update Supabase
+      // Update Supabase ONLY (no blockchain call)
       console.log('📝 Updating profile in Supabase...');
       const supabaseUpdate = {
         wallet_address: account.toLowerCase(),
@@ -451,29 +397,21 @@ export const Web3Provider = ({ children }) => {
 
       const result = await SupabaseService.createOrUpdateUser(supabaseUpdate);
 
-      if (result.success) {
-        console.log('✅ Profile updated in Supabase');
-      } else {
+      if (!result.success) {
         console.error('⚠️ Failed to update profile in Supabase:', result.error);
+        return { success: false, message: 'Failed to update profile: ' + result.error };
       }
 
+      console.log('✅ Profile updated in Supabase');
+
       // Reload user data
-      await loadUserData(contract, account);
+      await loadUserData(account);
 
       return { success: true, message: 'Profile updated successfully!' };
 
     } catch (error) {
       console.error('❌ Update profile error:', error);
-
-      let errorMessage = 'Failed to update profile: ';
-
-      if (error.message.includes('user rejected')) {
-        errorMessage += 'Transaction was rejected.';
-      } else {
-        errorMessage += error.message;
-      }
-
-      return { success: false, message: errorMessage };
+      return { success: false, message: 'Failed to update profile: ' + error.message };
     } finally {
       setLoading(false);
     }

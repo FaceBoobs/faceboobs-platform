@@ -5,7 +5,7 @@ import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { SupabaseService } from '../services/supabaseService';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { supabase } from '../config/supabaseClient';
+import { supabase } from '../supabaseClient';
 import { ethers } from 'ethers';
 
 const Messages = () => {
