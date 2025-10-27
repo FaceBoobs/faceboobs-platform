@@ -3,11 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search as SearchIcon, Filter, Star } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
+import { useWeb3 } from '../contexts/Web3Context';
 import { supabase } from '../supabaseClient';
 import { SupabaseService } from '../services/supabaseService';
 
-const Search = ({ contract, user, viewOnly = false }) => {
+const Search = () => {
   const { toast } = useToast();
+  const { account, isConnected, user } = useWeb3();
+  const viewOnly = !isConnected;
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [filterCreatorsOnly, setFilterCreatorsOnly] = useState(false);

@@ -104,7 +104,7 @@ const ViewOnlyMode = ({ onConnect, loading }) => {
           element={
             <div>
               <ReadOnlyIndicator />
-              <Search viewOnly={true} />
+              <Search />
             </div>
           }
         />
