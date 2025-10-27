@@ -156,13 +156,17 @@ const Profile = () => {
         setUserContents([]);
       }
 
-      // Load following status if available
-      if (!isOwnProfile && user?.address && contract) {
+      // Load following status from Supabase
+      if (!isOwnProfile && user?.address) {
         try {
-          const following = await contract.isFollowing(user.address, profileAddress);
-          setIsFollowing(following);
+          console.log('🔍 Checking if following:', user.address, '->', profileAddress);
+          const followResult = await SupabaseService.isFollowing(user.address, profileAddress);
+          if (followResult.success) {
+            setIsFollowing(followResult.isFollowing);
+            console.log('✅ Following status:', followResult.isFollowing);
+          }
         } catch (error) {
-          console.log('Unable to check following status');
+          console.log('Unable to check following status:', error);
         }
       }
 
@@ -175,16 +179,27 @@ const Profile = () => {
 
   const handleFollow = async () => {
     try {
-      const tx = isFollowing 
-        ? await contract.unfollowUser(profileAddress)
-        : await contract.followUser(profileAddress);
-      await tx.wait();
-      
-      setIsFollowing(!isFollowing);
-      await loadProfileData();
-      
+      console.log('🔄 Follow action:', isFollowing ? 'UNFOLLOW' : 'FOLLOW');
+      console.log('   Current user:', user.address);
+      console.log('   Target user:', profileAddress);
+
+      // Use Supabase ONLY (no blockchain call)
+      const result = isFollowing
+        ? await SupabaseService.unfollowUser(user.address, profileAddress)
+        : await SupabaseService.followUser(user.address, profileAddress);
+
+      if (result.success) {
+        console.log('✅ Follow action successful:', result.action);
+        setIsFollowing(!isFollowing);
+        await loadProfileData();
+        toast.success(isFollowing ? 'Unfollowed successfully' : 'Following!');
+      } else {
+        console.error('❌ Follow action failed:', result.error);
+        toast.error('Follow action failed: ' + result.error);
+      }
+
     } catch (error) {
-      console.error('Follow error:', error);
+      console.error('❌ Follow error:', error);
       toast.error('Follow action failed: ' + error.message);
     }
   };

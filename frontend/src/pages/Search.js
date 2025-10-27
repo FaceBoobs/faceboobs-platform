@@ -96,17 +96,8 @@ const Search = ({ contract, user, viewOnly = false }) => {
             [userData.wallet_address]: !isFollowing
           }));
 
-          // Try to update blockchain if contract available (optional)
-          if (contract) {
-            try {
-              const tx = isFollowing
-                ? await contract.unfollowUser(userData.wallet_address)
-                : await contract.followUser(userData.wallet_address);
-              await tx.wait();
-            } catch (blockchainError) {
-              console.warn('Blockchain update failed, but database is updated:', blockchainError);
-            }
-          }
+          // NO blockchain call - follow system uses ONLY Supabase
+          console.log('✅ Follow updated in Supabase only (no blockchain)');
 
           toast.success(isFollowing ? 'Unfollowed successfully!' : 'Following successfully!');
 
