@@ -92,6 +92,23 @@ export class SupabaseService {
     }
   }
 
+  static async updatePost(postId, updates) {
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .update(updates)
+        .eq('id', postId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error updating post:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Stories
   static async createStory(storyData) {
     try {

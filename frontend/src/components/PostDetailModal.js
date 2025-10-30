@@ -100,6 +100,13 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
       return;
     }
 
+    // Check if blockchain content ID exists
+    if (!content.blockchainContentId) {
+      console.error('❌ No blockchain content ID found for this post');
+      toast.error('This post is not registered on blockchain. Cannot purchase.');
+      return;
+    }
+
     try {
       setPurchasing(true);
 
@@ -112,10 +119,14 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
       });
 
       // Step 1: Call smart contract to purchase content
-      console.log('🛒 Purchasing content from modal...', { contentId: content.id, price: content.price });
+      console.log('🛒 Purchasing content from modal...', {
+        supabaseId: content.id,
+        blockchainContentId: content.blockchainContentId,
+        price: content.price
+      });
       toast.info('🔐 Opening MetaMask for transaction confirmation...');
 
-      const tx = await contract.buyContent(content.id, {
+      const tx = await contract.buyContent(content.blockchainContentId, {
         value: priceInWei, // Pass Wei value to contract
         gasLimit: 300000
       });
@@ -131,7 +142,7 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
       console.log('💾 Saving purchase to Supabase...');
       const purchaseData = {
         user_address: account.toLowerCase(),
-        post_id: parseInt(content.id),
+        post_id: parseInt(content.id), // Save Supabase post ID
         amount: content.price.toString(), // Save original price in BNB
         transaction_hash: receipt.hash,
         created_at: new Date().toISOString()

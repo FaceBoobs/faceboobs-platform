@@ -213,9 +213,54 @@ const CreatePost = () => {
 
           // Wait for transaction confirmation
           const receipt = await tx.wait();
-          console.log('✅ Transaction confirmed on blockchain:', receipt.hash);
+          console.log('✅ Transaction confirmed on blockchain:', receipt);
 
-          toast.success('✅ Post registered on blockchain successfully!');
+          // Parse the ContentCreated event to get the blockchain contentId
+          let blockchainContentId = null;
+          try {
+            // Find ContentCreated event in receipt
+            const contentCreatedEvent = receipt.logs.find(log => {
+              try {
+                const parsed = contract.interface.parseLog(log);
+                return parsed && parsed.name === 'ContentCreated';
+              } catch (e) {
+                return false;
+              }
+            });
+
+            if (contentCreatedEvent) {
+              const parsed = contract.interface.parseLog(contentCreatedEvent);
+              blockchainContentId = parsed.args.contentId.toString();
+              console.log('🔢 Blockchain contentId from event:', blockchainContentId);
+            } else {
+              console.warn('⚠️ ContentCreated event not found in receipt');
+            }
+          } catch (eventError) {
+            console.error('❌ Error parsing ContentCreated event:', eventError);
+          }
+
+          // Update Supabase post with blockchain_content_id
+          if (blockchainContentId) {
+            try {
+              console.log('💾 Updating post with blockchain_content_id:', blockchainContentId);
+              const updateResult = await SupabaseService.updatePost(result.data.id, {
+                blockchain_content_id: blockchainContentId
+              });
+
+              if (updateResult.success) {
+                console.log('✅ Post updated with blockchain_content_id');
+                toast.success(`✅ Post registered on blockchain (ID: ${blockchainContentId})!`);
+              } else {
+                console.error('⚠️ Failed to update post with blockchain_content_id:', updateResult.error);
+                toast.warning('⚠️ Post registered but failed to save blockchain ID to database');
+              }
+            } catch (updateError) {
+              console.error('❌ Error updating post with blockchain_content_id:', updateError);
+              toast.warning('⚠️ Post registered but failed to save blockchain ID');
+            }
+          } else {
+            toast.warning('⚠️ Post registered but blockchain ID not found');
+          }
 
         } catch (blockchainError) {
           console.error('❌ Blockchain registration failed:', blockchainError);

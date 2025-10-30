@@ -119,6 +119,7 @@ const Home = () => {
       // Convert Supabase posts to expected format
       const contentData = result.data.map(post => ({
         id: post.id,
+        blockchainContentId: post.blockchain_content_id || null, // ID from blockchain contract
         creator: post.creator_address,
         creatorData: {
           username: post.username || `User${post.creator_address?.substring(0, 6) || 'Unknown'}`,
@@ -226,8 +227,12 @@ const Home = () => {
     }
   };
 
-  const buyContent = async (contentId, price) => {
-    console.log('🛒 Starting content purchase...', { contentId, price });
+  const buyContent = async (contentId, price, blockchainContentId) => {
+    console.log('🛒 Starting content purchase...', {
+      supabaseId: contentId,
+      blockchainContentId,
+      price
+    });
 
     if (!contract) {
       toast.error('Contract not available. Please connect your wallet.');
@@ -236,6 +241,13 @@ const Home = () => {
 
     if (!account) {
       toast.error('Please connect your wallet first.');
+      return;
+    }
+
+    // Check if blockchain content ID exists
+    if (!blockchainContentId) {
+      console.error('❌ No blockchain content ID found for this post');
+      toast.error('This post is not registered on blockchain. Cannot purchase.');
       return;
     }
 
@@ -249,10 +261,10 @@ const Home = () => {
       });
 
       // Step 1: Call smart contract to purchase content
-      console.log('📞 Calling smart contract buyContent...');
+      console.log('📞 Calling smart contract buyContent with blockchain ID:', blockchainContentId);
       toast.info('🔐 Opening MetaMask for transaction confirmation...');
 
-      const tx = await contract.buyContent(contentId, {
+      const tx = await contract.buyContent(blockchainContentId, {
         value: priceInWei, // Pass Wei value to contract
         gasLimit: 300000 // Set a reasonable gas limit
       });
@@ -268,7 +280,7 @@ const Home = () => {
       console.log('💾 Saving purchase to Supabase...');
       const purchaseData = {
         user_address: account.toLowerCase(),
-        post_id: parseInt(contentId),
+        post_id: parseInt(contentId), // Save Supabase post ID
         amount: price.toString(), // Save original price in BNB
         transaction_hash: receipt.hash,
         created_at: new Date().toISOString()
@@ -434,7 +446,7 @@ const Home = () => {
 
     const handlePurchase = async () => {
       setPurchasing(true);
-      await buyContent(content.id, content.price);
+      await buyContent(content.id, content.price, content.blockchainContentId);
       // After successful purchase, reload access state
       const access = await checkContentAccess(content.id);
       setHasAccess(access);
@@ -572,6 +584,16 @@ const Home = () => {
             {content.isPaid && (
               <div className="flex items-center space-x-2 text-sm text-gray-500">
                 <span>💰 {content.price} BNB</span>
+                {content.blockchainContentId && (
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                    BC-ID: {content.blockchainContentId}
+                  </span>
+                )}
+                {!content.blockchainContentId && content.isPaid && (
+                  <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
+                    ⚠️ No BC-ID
+                  </span>
+                )}
               </div>
             )}
           </div>
