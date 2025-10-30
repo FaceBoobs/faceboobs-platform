@@ -4,17 +4,43 @@ import { X, MessageCircle, Lock } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { useComments } from '../contexts/CommentsContext';
+import { SupabaseService } from '../services/supabaseService';
+import { ethers } from 'ethers';
 import LikeButton from './LikeButton';
 import ShareButton from './ShareButton';
 
 const PostDetailModal = ({ isOpen, onClose, content }) => {
-  const { user, getMediaUrl } = useWeb3();
+  const { user, getMediaUrl, contract, account } = useWeb3();
   const { toast } = useToast();
   const { getComments, addComment } = useComments();
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
 
   const contentComments = content ? getComments(content.id.toString()) : [];
+
+  // Check content access when modal opens or account changes
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!content?.id || !account) {
+        setHasAccess(false);
+        return;
+      }
+
+      try {
+        const result = await SupabaseService.checkContentAccess(account, content.id);
+        setHasAccess(result.success ? result.hasAccess : false);
+      } catch (error) {
+        console.error('Error checking content access:', error);
+        setHasAccess(false);
+      }
+    };
+
+    if (isOpen && content) {
+      checkAccess();
+    }
+  }, [isOpen, content, account]);
 
   // Reset comment input when modal opens/closes
   useEffect(() => {
@@ -48,7 +74,7 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
 
     try {
       setSubmittingComment(true);
-      
+
       const result = await addComment(
         content.id.toString(),
         newComment.trim(),
@@ -59,12 +85,85 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
       if (result.success) {
         setNewComment('');
       }
-      
+
     } catch (error) {
       console.error('Error adding comment:', error);
       toast.error('Failed to add comment. Please try again.');
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  const handlePurchase = async () => {
+    if (!contract || !account || !content) {
+      toast.error('Please connect your wallet first.');
+      return;
+    }
+
+    try {
+      setPurchasing(true);
+
+      // Convert price from BNB to Wei
+      // content.price comes as string like "9.996" (in BNB) from database
+      const priceInWei = ethers.parseEther(content.price.toString());
+      console.log('💰 Price conversion:', {
+        priceInBNB: content.price,
+        priceInWei: priceInWei.toString()
+      });
+
+      // Step 1: Call smart contract to purchase content
+      console.log('🛒 Purchasing content from modal...', { contentId: content.id, price: content.price });
+      toast.info('🔐 Opening MetaMask for transaction confirmation...');
+
+      const tx = await contract.buyContent(content.id, {
+        value: priceInWei, // Pass Wei value to contract
+        gasLimit: 300000
+      });
+
+      console.log('⏳ Transaction sent:', tx.hash);
+      toast.info('⏳ Transaction sent! Waiting for confirmation...');
+
+      // Step 2: Wait for transaction confirmation
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt);
+
+      // Step 3: Save purchase to Supabase
+      console.log('💾 Saving purchase to Supabase...');
+      const purchaseData = {
+        user_address: account.toLowerCase(),
+        post_id: parseInt(content.id),
+        amount: content.price.toString(), // Save original price in BNB
+        transaction_hash: receipt.hash,
+        created_at: new Date().toISOString()
+      };
+
+      const saveResult = await SupabaseService.createPurchase(purchaseData);
+
+      if (!saveResult.success) {
+        console.error('⚠️ Failed to save purchase to Supabase:', saveResult.error);
+        toast.warning('Content purchased but failed to sync with database');
+      } else {
+        console.log('✅ Purchase saved to Supabase:', saveResult.data);
+      }
+
+      // Step 4: Update local state to unlock content
+      setHasAccess(true);
+      toast.success('🎉 Content purchased successfully!');
+
+    } catch (error) {
+      console.error('❌ Purchase failed:', error);
+
+      if (error.code === 4001) {
+        toast.error('Transaction cancelled by user');
+      } else if (error.code === 'INSUFFICIENT_FUNDS') {
+        toast.error('Insufficient BNB balance');
+      } else if (error.message?.includes('user rejected')) {
+        toast.error('Transaction rejected');
+      } else {
+        toast.error('Purchase failed: ' + (error.reason || error.message));
+      }
+    } finally {
+      setPurchasing(false);
     }
   };
 
@@ -110,40 +209,80 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
     >
       <div className="bg-white rounded-none md:rounded-lg w-full md:max-w-5xl h-full md:max-h-[90vh] overflow-hidden flex flex-col md:flex-row shadow-2xl">
         {/* Media Section */}
-        <div className="flex-1 md:flex-1 bg-black flex items-center justify-center min-h-0">
-          {displayUrl ? (
-            isVideo ? (
-              <video
-                src={displayUrl}
-                controls
-                className="max-w-full max-h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-            ) : (
-              <img 
-                src={displayUrl}
-                alt="Post content"
-                className="max-w-full max-h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-            )
-          ) : null}
-          <div 
-            className="flex items-center justify-center text-gray-400 text-center p-8"
-            style={{ display: displayUrl ? 'none' : 'flex' }}
-          >
-            <div>
-              <div className="text-6xl mb-4">{isVideo ? '🎥' : '📷'}</div>
-              <p className="text-lg">Content not available</p>
-              <p className="text-sm opacity-75">{isVideo ? 'Video' : 'Media'} may still be loading</p>
+        <div className="flex-1 md:flex-1 bg-black flex items-center justify-center min-h-0 relative">
+          {content.isPaid && !hasAccess ? (
+            // Locked content with blur effect
+            <div className="relative w-full h-full flex items-center justify-center">
+              {displayUrl && (
+                isVideo ? (
+                  <video
+                    src={displayUrl}
+                    className="max-w-full max-h-full object-contain blur-xl opacity-30"
+                  />
+                ) : (
+                  <img
+                    src={displayUrl}
+                    alt="Locked content preview"
+                    className="max-w-full max-h-full object-contain blur-xl opacity-30"
+                  />
+                )
+              )}
+              {/* Purchase Overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="bg-black bg-opacity-70 backdrop-blur-sm p-8 rounded-lg text-center text-white max-w-md">
+                  <Lock size={48} className="mx-auto mb-4" />
+                  <h3 className="text-2xl font-bold mb-2">Premium Content</h3>
+                  <p className="text-sm opacity-90 mb-6">
+                    Unlock this exclusive content for {content.price} BNB
+                  </p>
+                  <button
+                    onClick={handlePurchase}
+                    disabled={purchasing}
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 font-semibold"
+                  >
+                    {purchasing ? 'Purchasing...' : `Buy for ${content.price} BNB`}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            // Unlocked content - show normally
+            <>
+              {displayUrl ? (
+                isVideo ? (
+                  <video
+                    src={displayUrl}
+                    controls
+                    className="max-w-full max-h-full object-contain"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={displayUrl}
+                    alt="Post content"
+                    className="max-w-full max-h-full object-contain"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                )
+              ) : null}
+              <div
+                className="flex items-center justify-center text-gray-400 text-center p-8"
+                style={{ display: displayUrl ? 'none' : 'flex' }}
+              >
+                <div>
+                  <div className="text-6xl mb-4">{isVideo ? '🎥' : '📷'}</div>
+                  <p className="text-lg">Content not available</p>
+                  <p className="text-sm opacity-75">{isVideo ? 'Video' : 'Media'} may still be loading</p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Content Section */}

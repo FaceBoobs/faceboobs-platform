@@ -240,12 +240,20 @@ const Home = () => {
     }
 
     try {
+      // Convert price from BNB to Wei
+      // price comes as string like "9.996" (in BNB) from database
+      const priceInWei = ethers.parseEther(price.toString());
+      console.log('💰 Price conversion:', {
+        priceInBNB: price,
+        priceInWei: priceInWei.toString()
+      });
+
       // Step 1: Call smart contract to purchase content
       console.log('📞 Calling smart contract buyContent...');
       toast.info('🔐 Opening MetaMask for transaction confirmation...');
 
       const tx = await contract.buyContent(contentId, {
-        value: price,
+        value: priceInWei, // Pass Wei value to contract
         gasLimit: 300000 // Set a reasonable gas limit
       });
 
@@ -261,7 +269,7 @@ const Home = () => {
       const purchaseData = {
         user_address: account.toLowerCase(),
         post_id: parseInt(contentId),
-        amount: ethers.formatEther(price),
+        amount: price.toString(), // Save original price in BNB
         transaction_hash: receipt.hash,
         created_at: new Date().toISOString()
       };
