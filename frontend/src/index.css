@@ -3,15 +3,43 @@
 @tailwind utilities;
 
 /* FUTURISTIC PINK THEME */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* FORZA SFONDO ROSA OVUNQUE */
+html {
+  background: linear-gradient(135deg, #ff8fda 0%, #ff6bc9 25%, #e94cbb 50%, #d63bad 75%, #c02a9f 100%) !important;
+  background-attachment: fixed !important;
+  min-height: 100%;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #ff8fda 0%, #ff6bc9 25%, #e94cbb 50%, #d63bad 75%, #c02a9f 100%) !important;
-  background-attachment: fixed !important;
-  min-height: 100vh !important;
+  background: transparent !important;
+  min-height: 100vh;
   overflow-x: hidden;
+}
+
+#root {
+  background: transparent !important;
+  min-height: 100vh;
+}
+
+#root > * {
+  background: transparent !important;
+}
+
+.App {
+  background: transparent !important;
+}
+
+/* Rimuovi sfondi bianchi da tutti i container principali */
+main, .main-content, .container, [class*="max-w"] {
+  background: transparent !important;
 }
 
 #root {
