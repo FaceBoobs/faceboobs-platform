@@ -1,6 +1,7 @@
 // src/pages/Home.js
 import React, { useState, useEffect } from 'react';
 import { Lock, Plus, Trash2, MoreHorizontal } from 'lucide-react';
+import { ethers } from 'ethers';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useLikes } from '../contexts/LikesContext';
 import { useComments } from '../contexts/CommentsContext';
@@ -226,7 +227,7 @@ const Home = () => {
   };
 
   const buyContent = async (contentId, price) => {
-    console.log('Starting content purchase...', { contentId, price });
+    console.log('🛒 Starting content purchase...', { contentId, price });
 
     if (!contract) {
       toast.error('Contract not available. Please connect your wallet.');
@@ -239,15 +240,61 @@ const Home = () => {
     }
 
     try {
-      // For now, simulate purchase - in production you'd interact with smart contract
-      toast.info('Purchase simulation - content unlocked!');
+      // Step 1: Call smart contract to purchase content
+      console.log('📞 Calling smart contract buyContent...');
+      toast.info('🔐 Opening MetaMask for transaction confirmation...');
 
-      // Reload feed to show updated access
+      const tx = await contract.buyContent(contentId, {
+        value: price,
+        gasLimit: 300000 // Set a reasonable gas limit
+      });
+
+      console.log('⏳ Transaction sent:', tx.hash);
+      toast.info('⏳ Transaction sent! Waiting for confirmation...');
+
+      // Step 2: Wait for transaction confirmation
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt);
+
+      // Step 3: Save purchase to Supabase
+      console.log('💾 Saving purchase to Supabase...');
+      const purchaseData = {
+        user_address: account.toLowerCase(),
+        post_id: parseInt(contentId),
+        amount: ethers.formatEther(price),
+        transaction_hash: receipt.hash,
+        created_at: new Date().toISOString()
+      };
+
+      const saveResult = await SupabaseService.createPurchase(purchaseData);
+
+      if (!saveResult.success) {
+        console.error('⚠️ Failed to save purchase to Supabase:', saveResult.error);
+        // Still show success since blockchain tx succeeded
+        toast.warning('Content purchased but failed to sync with database');
+      } else {
+        console.log('✅ Purchase saved to Supabase:', saveResult.data);
+      }
+
+      // Step 4: Show success message
+      toast.success('🎉 Content purchased successfully!');
+
+      // Step 5: Reload feed to show unlocked content
       await loadFollowingAndFeed();
 
     } catch (error) {
-      console.error('Purchase failed:', error);
-      toast.error('Purchase failed: ' + error.message);
+      console.error('❌ Purchase failed:', error);
+
+      // Handle specific error cases
+      if (error.code === 4001) {
+        toast.error('Transaction cancelled by user');
+      } else if (error.code === 'INSUFFICIENT_FUNDS') {
+        toast.error('Insufficient BNB balance');
+      } else if (error.message?.includes('user rejected')) {
+        toast.error('Transaction rejected');
+      } else {
+        toast.error('Purchase failed: ' + (error.reason || error.message));
+      }
     }
   };
 
@@ -380,6 +427,9 @@ const Home = () => {
     const handlePurchase = async () => {
       setPurchasing(true);
       await buyContent(content.id, content.price);
+      // After successful purchase, reload access state
+      const access = await checkContentAccess(content.id);
+      setHasAccess(access);
       setPurchasing(false);
     };
 
