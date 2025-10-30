@@ -1,6 +1,7 @@
 // src/pages/CreatePost.js
 import React, { useState } from 'react';
 import { Upload, DollarSign, Lock, Globe } from 'lucide-react';
+import { ethers } from 'ethers';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
@@ -180,15 +181,77 @@ const CreatePost = () => {
       };
 
       const result = await SupabaseService.createPost(postData);
-      
+
       if (!result.success) {
         console.error('Supabase error:', result.error);
         throw new Error('Failed to save post: ' + result.error);
       }
 
       console.log('Post saved to Supabase:', result.data);
+
+      // Register content on blockchain if it's paid content
+      // Free content doesn't need blockchain registration
+      if (contract && formData.isPaid) {
+        try {
+          console.log('📝 Registering post on blockchain...');
+          toast.info('⏳ Please confirm the transaction in MetaMask to register your post on blockchain...');
+
+          // Convert price from BNB to Wei
+          const priceInWei = ethers.parseEther(formData.price.toString());
+
+          console.log('📞 Calling contract.createContent with:', {
+            contentHash,
+            priceInWei: priceInWei.toString(),
+            isPaid: formData.isPaid
+          });
+
+          // Call smart contract to register content
+          const tx = await contract.createContent(contentHash, priceInWei, formData.isPaid);
+
+          console.log('⏳ Transaction sent:', tx.hash);
+          toast.info('⏳ Transaction sent! Waiting for blockchain confirmation...');
+
+          // Wait for transaction confirmation
+          const receipt = await tx.wait();
+          console.log('✅ Transaction confirmed on blockchain:', receipt.hash);
+
+          toast.success('✅ Post registered on blockchain successfully!');
+
+        } catch (blockchainError) {
+          console.error('❌ Blockchain registration failed:', blockchainError);
+
+          // Handle specific blockchain errors
+          if (blockchainError.code === 4001) {
+            toast.error('Transaction cancelled. Post saved to database but not registered on blockchain.');
+          } else if (blockchainError.code === 'INSUFFICIENT_FUNDS') {
+            toast.error('Insufficient BNB for gas fees. Post saved to database but not registered on blockchain.');
+          } else {
+            toast.warning('⚠️ Post saved to database but blockchain registration failed: ' + (blockchainError.reason || blockchainError.message));
+          }
+
+          // Don't throw - post is already in database
+          console.warn('Continuing despite blockchain error...');
+        }
+      } else if (contract && !formData.isPaid) {
+        // For free content, still register on blockchain with price = 0
+        try {
+          console.log('📝 Registering free post on blockchain...');
+          toast.info('⏳ Registering free content on blockchain...');
+
+          const tx = await contract.createContent(contentHash, 0, false);
+          const receipt = await tx.wait();
+
+          console.log('✅ Free content registered on blockchain:', receipt.hash);
+          toast.success('✅ Free content registered on blockchain!');
+
+        } catch (blockchainError) {
+          console.warn('Blockchain registration failed for free content:', blockchainError);
+          // For free content, it's less critical if blockchain fails
+        }
+      }
+
       toast.success('✅ Post created successfully! Your content is now live!');
-      
+
       // Reset form
       setFormData({
         file: null,
@@ -198,11 +261,14 @@ const CreatePost = () => {
       });
       setPreview(null);
       setCompressionData(null);
-      
+
+      // Trigger feed refresh
+      window.dispatchEvent(new CustomEvent('refreshFeed'));
+
       // Navigate to home
       setTimeout(() => {
         navigate('/');
-      }, 1000);
+      }, 1500);
       
     } catch (error) {
       console.error('Error creating post:', error);
