@@ -4,7 +4,13 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* FUTURISTIC PINK GRADIENT BACKGROUND */
+  background: linear-gradient(135deg, #ff8fda 0%, #ff6bc9 50%, #e94cbb 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
 }
 
 code {
