@@ -9,7 +9,7 @@
 
 /* FORZA SFONDO ROSA OVUNQUE */
 html {
-  background: linear-gradient(135deg, #ff8fda 0%, #ff6bc9 25%, #e94cbb 50%, #d63bad 75%, #c02a9f 100%) !important;
+  background: linear-gradient(135deg, #ffe4f5 0%, #ffd4f0 25%, #ffc4eb 50%, #ffb4e6 75%, #ffa4e1 100%) !important;
   background-attachment: fixed !important;
   min-height: 100%;
 }
