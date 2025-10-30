@@ -6,6 +6,7 @@ import { Edit, UserPlus, UserMinus, Grid, Trash2 } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import EditProfileModal from '../components/EditProfileModal';
+import PostDetailModal from '../components/PostDetailModal';
 import { SupabaseService } from '../services/supabaseService';
 
 const Profile = () => {
@@ -19,7 +20,8 @@ const Profile = () => {
   const [userContents, setUserContents] = useState([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [showPostDetail, setShowPostDetail] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
@@ -258,34 +260,7 @@ const Profile = () => {
     }
   };
 
-  // Image Modal Component
-  const ImageModal = ({ src, alt, isOpen, onClose }) => {
-    if (!isOpen) return null;
-
-    return (
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-        onClick={onClose}
-      >
-        <div className="relative max-w-4xl max-h-full">
-          <img 
-            src={src} 
-            alt={alt}
-            className="max-w-full max-h-full object-contain rounded-lg"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-opacity-75 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Removed ProfileImageGrid - using MediaDisplay component instead
+  // Removed old ImageModal component - now using PostDetailModal for consistency
 
   if (loading) {
     return (
@@ -435,7 +410,10 @@ const Profile = () => {
                       src={content.content}
                       alt="Post content"
                       className="w-full h-full object-cover cursor-pointer"
-                      onClick={() => setSelectedImage(content.content)}
+                      onClick={() => {
+                        setSelectedPost(content);
+                        setShowPostDetail(true);
+                      }}
                     />
                   </div>
                   {/* Delete button for own profile */}
@@ -457,15 +435,17 @@ const Profile = () => {
           )}
         </div>
       </div>
-      
-      {/* Image Modal */}
-      <ImageModal
-        src={selectedImage}
-        alt="Profile content"
-        isOpen={!!selectedImage}
-        onClose={() => setSelectedImage(null)}
+
+      {/* Post Detail Modal */}
+      <PostDetailModal
+        isOpen={showPostDetail}
+        onClose={() => {
+          setShowPostDetail(false);
+          setSelectedPost(null);
+        }}
+        content={selectedPost}
       />
-      
+
       {/* Edit Profile Modal */}
       <EditProfileModal
         isOpen={showEditModal}
