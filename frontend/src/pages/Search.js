@@ -271,33 +271,6 @@ const Search = () => {
           </div>
         </div>
       )}
-
-      {!searchQuery.trim() && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Popular Categories</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { name: 'Crypto Art', icon: '🎨', count: 45 },
-              { name: 'DeFi', icon: '💰', count: 32 },
-              { name: 'Gaming', icon: '🎮', count: 28 },
-              { name: 'Education', icon: '📚', count: 67 }
-            ].map((category) => (
-              <button
-                key={category.name}
-                onClick={() => {
-                  setSearchQuery(category.name.toLowerCase());
-                  performSearch();
-                }}
-                className="p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center"
-              >
-                <div className="text-2xl mb-2">{category.icon}</div>
-                <div className="font-medium text-gray-900">{category.name}</div>
-                <div className="text-sm text-gray-500">{category.count} creators</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

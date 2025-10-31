@@ -374,41 +374,6 @@ const Earnings = () => {
         )}
       </div>
 
-      {/* Tips Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6">
-        <h3 className="font-semibold text-blue-900 mb-4 text-lg">💡 Tips to Maximize Your Earnings</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-blue-800">
-          <ul className="space-y-3">
-            <li className="flex items-start">
-              <span className="mr-2">✅</span>
-              <span>Create high-quality, exclusive content that provides real value</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">✅</span>
-              <span>Price competitively (0.001-0.01 BNB for most content)</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">✅</span>
-              <span>Post consistently to build a loyal audience</span>
-            </li>
-          </ul>
-          <ul className="space-y-3">
-            <li className="flex items-start">
-              <span className="mr-2">✅</span>
-              <span>Engage with your followers through comments and messages</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">✅</span>
-              <span>Use free posts and stories to promote your premium content</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">✅</span>
-              <span>Cross-promote on social media to grow your audience</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-
       {/* Withdraw Confirmation Modal */}
       {showWithdrawConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

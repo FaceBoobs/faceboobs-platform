@@ -812,13 +812,6 @@ const Home = () => {
             {contents.map((content) => (
               <ContentCard key={content.id} content={content} />
             ))}
-
-            {contents.length > 0 && (
-              <div className="text-center py-8">
-                <p className="text-gray-500">You're all caught up!</p>
-                <p className="text-sm text-gray-400 mt-2">Create more content or follow other creators</p>
-              </div>
-            )}
           </div>
         </div>
 
