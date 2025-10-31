@@ -197,7 +197,10 @@ const Earnings = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white p-8 shadow-lg">
+      <div
+        className="rounded-xl text-white p-8 shadow-lg"
+        style={{ background: 'linear-gradient(135deg, #d63bad 0%, #ff6bc9 50%, #ffe6f7 100%)' }}
+      >
         <h1 className="text-4xl font-bold mb-2">💰 Creator Earnings</h1>
         <p className="opacity-90 text-lg">Track your performance and manage your earnings</p>
       </div>
