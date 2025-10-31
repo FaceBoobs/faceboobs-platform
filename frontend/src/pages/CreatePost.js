@@ -28,7 +28,7 @@ const CreatePost = () => {
   const uploadImage = async (file) => {
     try {
       // Convert to base64 for now - you can replace this with actual IPFS upload
-      const base64Data = await compressImage(file, 0.7);
+      const base64Data = await compressImage(file, 0.95);
       
       // For production, upload to IPFS and return the hash
       // const ipfsHash = await ipfsClient.add(file);
@@ -40,19 +40,19 @@ const CreatePost = () => {
     }
   };
 
-  // Compress image function
-  const compressImage = (file, quality = 0.7) => {
+  // Compress image function with HIGH QUALITY settings
+  const compressImage = (file, quality = 0.95) => {
     return new Promise((resolve) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = new Image();
-      
+
       img.onload = () => {
-        // Calculate new dimensions (max 800px width)
-        const maxWidth = 800;
-        const maxHeight = 600;
+        // Calculate new dimensions (max 2400px - HIGH QUALITY)
+        const maxWidth = 2400;
+        const maxHeight = 2400;
         let { width, height } = img;
-        
+
         if (width > height) {
           if (width > maxWidth) {
             height = (height * maxWidth) / width;
@@ -64,17 +64,24 @@ const CreatePost = () => {
             height = maxHeight;
           }
         }
-        
+
         canvas.width = width;
         canvas.height = height;
-        
-        // Draw and compress
+
+        // Enable high-quality image smoothing
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // Draw and compress with HIGH QUALITY
         ctx.drawImage(img, 0, 0, width, height);
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-        
+
+        // Use PNG for better quality if original was PNG, otherwise high-quality JPEG
+        const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        const compressedDataUrl = canvas.toDataURL(mimeType, quality);
+
         resolve(compressedDataUrl);
       };
-      
+
       const reader = new FileReader();
       reader.onload = (e) => img.src = e.target.result;
       reader.readAsDataURL(file);
@@ -142,10 +149,10 @@ const CreatePost = () => {
       setUploading(true);
       console.log('Starting upload process...');
       
-      // Convert file to base64 (compressed for images)
+      // Convert file to base64 (compressed for images with HIGH QUALITY)
       let base64Data;
       if (formData.file.type.startsWith('image/')) {
-        base64Data = await compressImage(formData.file, 0.7);
+        base64Data = await compressImage(formData.file, 0.95);
         
         // Update compression data
         const compressedSize = Math.round((base64Data.length * 3) / 4);

@@ -50,8 +50,13 @@ export const LikesProvider = ({ children }) => {
           result.data.forEach(postId => {
             if (newData[postId]) {
               newData[postId].isLiked = true;
+              // Add current user to likers if not already present
+              if (!newData[postId].likers.includes(account)) {
+                newData[postId].likers.push(account);
+              }
             } else {
-              newData[postId] = { count: 0, isLiked: true, likers: [] };
+              // Create new entry with current user in likers array
+              newData[postId] = { count: 1, isLiked: true, likers: [account] };
             }
           });
           return newData;

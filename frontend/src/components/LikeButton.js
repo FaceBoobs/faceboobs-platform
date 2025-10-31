@@ -13,8 +13,9 @@ const LikeButton = ({ contentId, className = "", size = 20 }) => {
   
   // Get current like data and check if current user has liked
   const likeData = getLikeData(contentId);
-  const { count, likers } = likeData;
-  const isLiked = account ? likers.includes(account) : false;
+  const { count, likers, isLiked: contextIsLiked } = likeData;
+  // Use context isLiked if available, fallback to checking likers array
+  const isLiked = account ? (contextIsLiked || likers.includes(account)) : false;
 
   // Initialize likes for this content on mount
   useEffect(() => {
