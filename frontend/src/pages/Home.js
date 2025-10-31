@@ -577,7 +577,7 @@ const Home = () => {
               <ShareButton
                 contentId={content.id.toString()}
                 contentAuthor={content.creatorData.username}
-                contentDescription={content.description || "Amazing content on SocialWeb3"}
+                contentDescription={content.description || "Amazing content on FaceBoobs"}
               />
             </div>
             

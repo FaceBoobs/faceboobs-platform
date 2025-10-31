@@ -265,7 +265,7 @@ function AppContent() {
               <div className="w-full text-center py-12">
                 <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white p-8 mx-4 max-w-lg mx-auto">
                   <div className="text-6xl mb-4">🔐</div>
-                  <h2 className="text-3xl font-bold mb-3">Welcome to SocialWeb3</h2>
+                  <h2 className="text-3xl font-bold mb-3">Welcome to FaceBoobs</h2>
                   <p className="opacity-90 mb-6 text-lg">
                     Connect your wallet to access your personalized feed and interact with creators
                   </p>

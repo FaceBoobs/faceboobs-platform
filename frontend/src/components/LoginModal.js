@@ -47,7 +47,7 @@ const LoginModal = ({ onRegister, onClose, loading }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl max-w-md w-full">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Welcome to SocialWeb3</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Welcome to FaceBoobs</h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full">
             <X size={20} />
           </button>

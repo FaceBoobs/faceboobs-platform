@@ -87,7 +87,7 @@ const StoryViewer = ({ stories, initialIndex, isOpen, onClose }) => {
       if (navigator.share) {
         navigator.share({
           title: `${currentStory.creatorData.username}'s story`,
-          text: 'Check out this story on SocialWeb3!',
+          text: 'Check out this story on FaceBoobs!',
           url: window.location.href
         });
       } else {

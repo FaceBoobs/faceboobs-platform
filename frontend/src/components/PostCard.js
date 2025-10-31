@@ -177,7 +177,7 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
             <ShareButton
               contentId={content.id.toString()}
               contentAuthor={content.creatorData?.username || 'Anonymous'}
-              contentDescription="Amazing content on SocialWeb3"
+              contentDescription="Amazing content on FaceBoobs"
               showLabel={true}
             />
           </div>

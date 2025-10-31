@@ -22,13 +22,13 @@ const ShareModal = ({ isOpen, onClose, contentId, contentAuthor, contentDescript
 
   // Generate shareable URL for the content
   const shareUrl = `${window.location.origin}/post/${contentId}`;
-  const shareText = contentDescription 
-    ? `Check out this amazing content by ${contentAuthor}: "${contentDescription}" 🔥` 
-    : `Check out this amazing content by ${contentAuthor} on SocialWeb3! 🔥`;
+  const shareText = contentDescription
+    ? `Check out this amazing content by ${contentAuthor}: "${contentDescription}" 🔥`
+    : `Check out this amazing content by ${contentAuthor} on FaceBoobs! 🔥`;
 
   // Social media sharing URLs
   const shareLinks = {
-    twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}&hashtags=SocialWeb3,Web3,Crypto`,
+    twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}&hashtags=FaceBoobs,Web3,Crypto`,
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`,
     telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`,
     whatsapp: `https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`,

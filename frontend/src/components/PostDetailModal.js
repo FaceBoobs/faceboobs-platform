@@ -350,7 +350,7 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
                 <ShareButton
                   contentId={content.id.toString()}
                   contentAuthor={content.creatorData?.username || 'Unknown'}
-                  contentDescription="Check out this amazing post on SocialWeb3"
+                  contentDescription="Check out this amazing post on FaceBoobs"
                 />
               </div>
               {content.isPaid && (
