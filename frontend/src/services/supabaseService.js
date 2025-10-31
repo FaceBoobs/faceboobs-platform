@@ -779,6 +779,38 @@ export class SupabaseService {
     }
   }
 
+  static async getCreatorPurchases(creatorAddress) {
+    try {
+      // Step 1: Get all posts created by this creator
+      const { data: posts, error: postsError } = await supabase
+        .from('posts')
+        .select('id')
+        .eq('creator_address', creatorAddress.toLowerCase());
+
+      if (postsError) throw postsError;
+
+      // If no posts, return empty array
+      if (!posts || posts.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      const postIds = posts.map(p => p.id);
+
+      // Step 2: Get all purchases of these posts
+      const { data, error } = await supabase
+        .from('purchases')
+        .select('*')
+        .in('post_id', postIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return { success: true, data: data || [] };
+    } catch (error) {
+      console.error('Error fetching creator purchases:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   static async checkContentAccess(userAddress, postId) {
     try {
       // Check if post is free

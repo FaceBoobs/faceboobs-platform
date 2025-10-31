@@ -1,94 +1,188 @@
 // src/pages/Earnings.js
-/* global BigInt */
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { DollarSign, TrendingUp, Download, Eye } from 'lucide-react';
+import { DollarSign, TrendingUp, Download, ShoppingBag, AlertCircle, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
+import { SupabaseService } from '../services/supabaseService';
 
-const Earnings = ({ contract, user }) => {
+const Earnings = () => {
+  const { contract, user, account } = useWeb3();
   const { toast } = useToast();
-  const [earnings, setEarnings] = useState('0');
-  const [contentStats, setContentStats] = useState([]);
-  const [withdrawing, setWithdrawing] = useState(false);
+  const navigate = useNavigate();
+
+  const [earnings, setEarnings] = useState({
+    totalEarned: '0',
+    availableBalance: '0',
+    alreadyWithdrawn: '0',
+    totalSales: 0
+  });
+  const [recentTransactions, setRecentTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
 
   useEffect(() => {
-    if (contract && user) {
+    // Check if user is a creator
+    if (user && !user.isCreator) {
+      toast.error('Access denied. This page is for creators only.');
+      navigate('/');
+      return;
+    }
+
+    if (contract && user && account) {
       loadEarningsData();
     }
-  }, [contract, user]);
+  }, [contract, user, account]);
 
   const loadEarningsData = async () => {
     try {
       setLoading(true);
-      
-      const userData = await contract.getUser(user.address);
-      setEarnings(ethers.formatEther(userData.totalEarnings));
-      
-      const contentIds = await contract.getUserContents(user.address);
-      const stats = [];
-      
-      for (let id of contentIds) {
-        try {
-          const content = await contract.getContent(Number(id));
-          const purchaseCount = Number(content.purchaseCount);
-          
-          stats.push({
-            id: Number(id),
-            contentHash: content.contentHash,
-            price: content.price,
-            isPaid: content.isPaid,
-            purchaseCount,
-            earnings: content.isPaid ? content.price * BigInt(purchaseCount) * 98n / 100n : 0n,
-            timestamp: Number(content.timestamp)
-          });
-        } catch (error) {
-          console.error('Error loading content stats:', error);
-        }
+      console.log('📊 Loading earnings data for creator:', account);
+
+      // 1. Load total earned from Supabase (sum of all purchases)
+      const purchasesResult = await SupabaseService.getCreatorPurchases(account);
+
+      let totalEarnedFromDB = 0;
+      let transactions = [];
+
+      if (purchasesResult.success && purchasesResult.data) {
+        console.log('💰 Found purchases:', purchasesResult.data.length);
+
+        // Calculate total earned (98% after platform fee)
+        totalEarnedFromDB = purchasesResult.data.reduce((sum, purchase) => {
+          const amount = parseFloat(purchase.amount);
+          return sum + (amount * 0.98); // 2% platform fee
+        }, 0);
+
+        // Prepare transactions for display
+        transactions = purchasesResult.data.map(purchase => ({
+          id: purchase.id,
+          buyer: purchase.user_address,
+          postId: purchase.post_id,
+          amount: purchase.amount,
+          transactionHash: purchase.transaction_hash,
+          date: new Date(purchase.created_at)
+        }));
       }
-      
-      setContentStats(stats.sort((a, b) => b.timestamp - a.timestamp));
-      
+
+      // 2. Load available balance from blockchain (if contract available)
+      let availableBalance = '0';
+      try {
+        if (contract && contract.getUser) {
+          const userData = await contract.getUser(account);
+          availableBalance = ethers.formatEther(userData.totalEarnings);
+          console.log('💳 Available balance from contract:', availableBalance);
+        }
+      } catch (blockchainError) {
+        console.warn('⚠️ Could not load blockchain balance:', blockchainError);
+        // Continue with Supabase data even if blockchain fails
+      }
+
+      // 3. Calculate withdrawn amount
+      const alreadyWithdrawn = Math.max(0, totalEarnedFromDB - parseFloat(availableBalance));
+
+      setEarnings({
+        totalEarned: totalEarnedFromDB.toFixed(6),
+        availableBalance: availableBalance,
+        alreadyWithdrawn: alreadyWithdrawn.toFixed(6),
+        totalSales: purchasesResult.data?.length || 0
+      });
+
+      setRecentTransactions(transactions.sort((a, b) => b.date - a.date));
+
+      console.log('✅ Earnings data loaded:', {
+        totalEarned: totalEarnedFromDB,
+        availableBalance,
+        alreadyWithdrawn,
+        totalSales: transactions.length
+      });
+
     } catch (error) {
-      console.error('Error loading earnings data:', error);
+      console.error('❌ Error loading earnings data:', error);
+      toast.error('Failed to load earnings data');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleWithdraw = async () => {
+  const handleWithdrawClick = () => {
+    if (parseFloat(earnings.availableBalance) <= 0) {
+      toast.warning('No balance available to withdraw');
+      return;
+    }
+    setShowWithdrawConfirm(true);
+  };
+
+  const handleWithdrawConfirm = async () => {
+    if (!contract) {
+      toast.error('Contract not available. Please connect your wallet.');
+      return;
+    }
+
     try {
       setWithdrawing(true);
-      
+      setShowWithdrawConfirm(false);
+
+      console.log('💸 Initiating withdrawal of', earnings.availableBalance, 'BNB');
+      toast.info('🔐 Please confirm the transaction in MetaMask...');
+
+      // Call withdrawEarnings() - withdraws all available balance
       const tx = await contract.withdrawEarnings();
-      await tx.wait();
-      
-      toast.success('Earnings withdrawn successfully!');
+
+      console.log('⏳ Transaction sent:', tx.hash);
+      toast.info('⏳ Transaction sent! Waiting for confirmation...');
+
+      // Wait for confirmation
+      const receipt = await tx.wait();
+      console.log('✅ Withdrawal confirmed:', receipt.hash);
+
+      toast.success(`🎉 Successfully withdrew ${earnings.availableBalance} BNB!`);
+
+      // Reload data
       await loadEarningsData();
-      
+
     } catch (error) {
-      console.error('Withdrawal error:', error);
-      toast.error('Withdrawal failed: ' + error.message);
+      console.error('❌ Withdrawal failed:', error);
+
+      if (error.code === 4001) {
+        toast.error('Transaction cancelled by user');
+      } else if (error.code === 'INSUFFICIENT_FUNDS') {
+        toast.error('Insufficient BNB for gas fees');
+      } else if (error.message?.includes('user rejected')) {
+        toast.error('Transaction rejected');
+      } else {
+        toast.error('Withdrawal failed: ' + (error.reason || error.message));
+      }
     } finally {
       setWithdrawing(false);
     }
   };
 
-  const formatTimeAgo = (timestamp) => {
-    const now = Math.floor(Date.now() / 1000);
-    const diff = now - timestamp;
-    
-    if (diff < 86400) return 'Today';
-    if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
-    return new Date(timestamp * 1000).toLocaleDateString();
+  const formatAddress = (address) => {
+    if (!address) return 'Unknown';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const formatDate = (date) => {
+    if (!date) return 'Unknown';
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
   };
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="animate-pulse space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl h-32"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((i) => (
               <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="h-8 bg-gray-200 rounded mb-4"></div>
                 <div className="h-12 bg-gray-200 rounded"></div>
@@ -101,84 +195,110 @@ const Earnings = ({ contract, user }) => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white p-6">
-        <h1 className="text-3xl font-bold mb-2">Creator Earnings</h1>
-        <p className="opacity-90">Track your content performance and withdraw your earnings</p>
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white p-8 shadow-lg">
+        <h1 className="text-4xl font-bold mb-2">💰 Creator Earnings</h1>
+        <p className="opacity-90 text-lg">Track your performance and manage your earnings</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Total Earned */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-700">Total Earnings</h3>
-            <DollarSign className="text-green-500" size={24} />
+            <h3 className="font-semibold text-gray-700">Total Earned</h3>
+            <div className="p-2 bg-green-100 rounded-lg">
+              <DollarSign className="text-green-600" size={24} />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-gray-900">{parseFloat(earnings).toFixed(4)} BNB</div>
-          <div className="text-sm text-gray-500">≈ ${(parseFloat(earnings) * 300).toFixed(2)} USD</div>
+          <div className="text-3xl font-bold text-gray-900">{parseFloat(earnings.totalEarned).toFixed(4)}</div>
+          <div className="text-sm text-gray-500 mt-1">BNB (all time)</div>
+          <div className="text-xs text-gray-400 mt-2">≈ ${(parseFloat(earnings.totalEarned) * 300).toFixed(2)} USD</div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        {/* Available Balance */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-700">Total Content</h3>
-            <Eye className="text-blue-500" size={24} />
+            <h3 className="font-semibold text-gray-700">Available</h3>
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <TrendingUp className="text-blue-600" size={24} />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-gray-900">{contentStats.length}</div>
-          <div className="text-sm text-gray-500">Posts created</div>
+          <div className="text-3xl font-bold text-blue-600">{parseFloat(earnings.availableBalance).toFixed(4)}</div>
+          <div className="text-sm text-gray-500 mt-1">BNB (withdrawable)</div>
+          <div className="text-xs text-green-600 mt-2 font-medium">Ready to withdraw</div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        {/* Already Withdrawn */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-700">Withdrawn</h3>
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <CheckCircle className="text-purple-600" size={24} />
+            </div>
+          </div>
+          <div className="text-3xl font-bold text-gray-900">{parseFloat(earnings.alreadyWithdrawn).toFixed(4)}</div>
+          <div className="text-sm text-gray-500 mt-1">BNB (historical)</div>
+        </div>
+
+        {/* Total Sales */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-700">Total Sales</h3>
-            <TrendingUp className="text-orange-500" size={24} />
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <ShoppingBag className="text-orange-600" size={24} />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-gray-900">
-            {contentStats.reduce((sum, content) => sum + content.purchaseCount, 0)}
-          </div>
-          <div className="text-sm text-gray-500">Content purchases</div>
+          <div className="text-3xl font-bold text-gray-900">{earnings.totalSales}</div>
+          <div className="text-sm text-gray-500 mt-1">Content purchases</div>
         </div>
       </div>
 
+      {/* Withdraw Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Available for Withdrawal</h3>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+          <div className="flex-1">
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Withdraw Earnings</h3>
             <p className="text-gray-600">
-              You have <span className="font-semibold text-green-600">{parseFloat(earnings).toFixed(4)} BNB</span> ready to withdraw
+              You have <span className="font-bold text-green-600">{parseFloat(earnings.availableBalance).toFixed(4)} BNB</span> available to withdraw
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
+              Platform fee: 2% • You receive: 98% of each sale
             </p>
           </div>
           <button
-            onClick={handleWithdraw}
-            disabled={withdrawing || parseFloat(earnings) === 0}
-            className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+            onClick={handleWithdrawClick}
+            disabled={withdrawing || parseFloat(earnings.availableBalance) <= 0}
+            className="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
           >
-            <Download size={20} />
-            <span>{withdrawing ? 'Withdrawing...' : 'Withdraw'}</span>
+            <Download size={24} />
+            <span>{withdrawing ? 'Processing...' : 'Withdraw All'}</span>
           </button>
         </div>
-        
-        {parseFloat(earnings) === 0 && (
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-yellow-800 text-sm">
-              <strong>Tip:</strong> Create premium content to start earning! Users pay to unlock your exclusive content.
-            </p>
+
+        {parseFloat(earnings.availableBalance) <= 0 && (
+          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start space-x-3">
+            <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
+            <div className="text-sm text-yellow-800">
+              <strong>No balance available.</strong> Create premium content and get sales to earn BNB!
+            </div>
           </div>
         )}
       </div>
 
+      {/* Recent Transactions Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Content Performance</h3>
-          <p className="text-gray-600">Track how your content is performing</p>
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+          <h3 className="text-xl font-semibold text-gray-900">Recent Transactions</h3>
+          <p className="text-gray-600 mt-1">History of your content purchases</p>
         </div>
 
-        {contentStats.length === 0 ? (
+        {recentTransactions.length === 0 ? (
           <div className="p-12 text-center">
-            <TrendingUp size={48} className="mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-500 mb-2">No content yet</h3>
-            <p className="text-gray-400 mb-4">Create your first post to start tracking performance</p>
-            <button className="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 transition-colors">
-              Create Content
-            </button>
+            <ShoppingBag size={48} className="mx-auto text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-500 mb-2">No transactions yet</h3>
+            <p className="text-gray-400 mb-4">Your sales will appear here once users purchase your content</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -186,59 +306,65 @@ const Earnings = ({ contract, user }) => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Content
+                    Buyer
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
+                    Post ID
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
+                    Amount
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Purchases
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Earnings
+                    Your Cut (98%)
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Transaction
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {contentStats.map((content) => (
-                  <tr key={content.id} className="hover:bg-gray-50">
+                {recentTransactions.slice(0, 20).map((tx) => (
+                  <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center mr-4">
-                          <span className="text-xs text-gray-600">#{content.id}</span>
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full flex items-center justify-center text-white font-semibold text-xs">
+                          {tx.buyer.slice(2, 4).toUpperCase()}
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">Content #{content.id}</div>
-                          <div className="text-sm text-gray-500">{content.contentHash.slice(0, 15)}...</div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium text-gray-900">{formatAddress(tx.buyer)}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        content.isPaid 
-                          ? 'bg-purple-100 text-purple-800' 
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {content.isPaid ? 'Premium' : 'Free'}
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                        #{tx.postId}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {content.isPaid ? `${content.price} BNB` : 'Free'}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      {parseFloat(tx.amount).toFixed(4)} BNB
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {content.purchaseCount}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                      {content.isPaid ? `${ethers.formatEther(content.earnings)} BNB` : '-'}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                      {(parseFloat(tx.amount) * 0.98).toFixed(4)} BNB
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatTimeAgo(content.timestamp)}
+                      {formatDate(tx.date)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {tx.transactionHash ? (
+                        <a
+                          href={`https://testnet.bscscan.com/tx/${tx.transactionHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          View →
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -248,21 +374,72 @@ const Earnings = ({ contract, user }) => {
         )}
       </div>
 
+      {/* Tips Section */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6">
-        <h3 className="font-semibold text-blue-900 mb-4">Tips to Increase Earnings</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800">
-          <ul className="space-y-2">
-            <li>• Create high-quality, exclusive content</li>
-            <li>• Price content competitively (0.001-0.01 BNB)</li>
-            <li>• Post consistently to build audience</li>
+        <h3 className="font-semibold text-blue-900 mb-4 text-lg">💡 Tips to Maximize Your Earnings</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-blue-800">
+          <ul className="space-y-3">
+            <li className="flex items-start">
+              <span className="mr-2">✅</span>
+              <span>Create high-quality, exclusive content that provides real value</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">✅</span>
+              <span>Price competitively (0.001-0.01 BNB for most content)</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">✅</span>
+              <span>Post consistently to build a loyal audience</span>
+            </li>
           </ul>
-          <ul className="space-y-2">
-            <li>• Engage with your followers regularly</li>
-            <li>• Use stories to promote premium content</li>
-            <li>• Cross-promote on other platforms</li>
+          <ul className="space-y-3">
+            <li className="flex items-start">
+              <span className="mr-2">✅</span>
+              <span>Engage with your followers through comments and messages</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">✅</span>
+              <span>Use free posts and stories to promote your premium content</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">✅</span>
+              <span>Cross-promote on social media to grow your audience</span>
+            </li>
           </ul>
         </div>
       </div>
+
+      {/* Withdraw Confirmation Modal */}
+      {showWithdrawConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Withdrawal</h3>
+            <p className="text-gray-600 mb-6">
+              You are about to withdraw <span className="font-bold text-green-600">{parseFloat(earnings.availableBalance).toFixed(4)} BNB</span> to your wallet.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> This will send all your available earnings to your connected wallet address.
+                Gas fees will be deducted from your wallet balance.
+              </p>
+            </div>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setShowWithdrawConfirm(false)}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleWithdrawConfirm}
+                className="flex-1 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold"
+              >
+                Confirm Withdraw
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
