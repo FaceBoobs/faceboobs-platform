@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import CONTRACT_ABI from '../contracts/SocialPlatform.json';
 import { SupabaseService } from '../services/supabaseService';
+import { supabase } from '../supabaseClient';
 
 const CONTRACT_ADDRESS = "0x575e0532445489dd31C12615BeC7C63d737B69DD";
 const BSC_TESTNET_CHAIN_ID = 97;
@@ -381,18 +382,85 @@ export const Web3Provider = ({ children }) => {
     try {
       setLoading(true);
 
-      let avatarHash = user.avatarHash || 'QmDefaultAvatar';
+      let avatarUrl = user.avatarHash || null;
+      let avatarBlockchainId = null;
+
+      // If new avatar file is uploaded
       if (avatarFile) {
-        avatarHash = await uploadMedia(avatarFile);
+        console.log('📤 Uploading avatar to Supabase Storage...');
+
+        // Step 1: Upload to Supabase Storage 'avatars' bucket
+        const timestamp = Date.now();
+        const fileExtension = avatarFile.name.split('.').pop();
+        const fileName = `avatar_${account.toLowerCase()}_${timestamp}.${fileExtension}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, avatarFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error('❌ Failed to upload avatar:', uploadError);
+          throw new Error('Failed to upload avatar: ' + uploadError.message);
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+        avatarUrl = urlData.publicUrl;
+        console.log('✅ Avatar uploaded to Supabase:', avatarUrl);
+
+        // Step 2: Register avatar on blockchain as FREE content (price=0, isPaid=false)
+        console.log('⛓️ Registering avatar on blockchain as free content...');
+
+        try {
+          const web3Provider = new ethers.BrowserProvider(window.ethereum);
+          const web3Signer = await web3Provider.getSigner();
+          const contractInstance = new ethers.Contract(
+            CONTRACT_ADDRESS,
+            CONTRACT_ABI.abi,
+            web3Signer
+          );
+
+          // Create content with price=0 and isPaid=false (FREE content)
+          const tx = await contractInstance.createContent(avatarUrl, 0, false);
+          console.log('⏳ Waiting for blockchain confirmation...');
+
+          const receipt = await tx.wait();
+          console.log('✅ Blockchain transaction confirmed:', receipt.hash);
+
+          // Extract contentId from ContentCreated event
+          const contentCreatedEvent = receipt.logs.find(
+            log => log.fragment && log.fragment.name === 'ContentCreated'
+          );
+
+          if (contentCreatedEvent) {
+            avatarBlockchainId = contentCreatedEvent.args[0].toString();
+            console.log('✅ Avatar registered on blockchain with ID:', avatarBlockchainId);
+          } else {
+            console.warn('⚠️ ContentCreated event not found in transaction logs');
+          }
+
+        } catch (blockchainError) {
+          console.error('❌ Blockchain registration failed:', blockchainError);
+          // Don't fail the entire profile update if blockchain registration fails
+          // The avatar is still uploaded to Supabase
+          console.log('⚠️ Continuing with profile update without blockchain registration');
+        }
       }
 
-      // Update Supabase ONLY (no blockchain call)
+      // Step 3: Update Supabase with avatar URL and blockchain ID
       console.log('📝 Updating profile in Supabase...');
       const supabaseUpdate = {
         wallet_address: account.toLowerCase(),
         username: username.trim(),
         bio: bio || null,
-        avatar_url: avatarHash !== 'QmDefaultAvatar' ? avatarHash : null
+        avatar_url: avatarUrl,
+        avatar_blockchain_id: avatarBlockchainId
       };
 
       const result = await SupabaseService.createOrUpdateUser(supabaseUpdate);
