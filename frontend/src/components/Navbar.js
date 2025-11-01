@@ -26,10 +26,23 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
       const result = await SupabaseService.countUnreadMessages(account);
       if (result.success) {
         setUnreadMessagesCount(result.count);
+        console.log('📊 [Navbar] Loaded unread count:', result.count);
       }
     };
 
     loadUnreadCount();
+
+    // Listen for manual refresh requests (e.g., after marking messages as read)
+    const handleRefreshUnreadCount = () => {
+      console.log('🔄 [Navbar] Refreshing unread count on request');
+      loadUnreadCount();
+    };
+
+    window.addEventListener('refreshUnreadCount', handleRefreshUnreadCount);
+
+    return () => {
+      window.removeEventListener('refreshUnreadCount', handleRefreshUnreadCount);
+    };
   }, [account]);
 
   // Subscribe to real-time message updates

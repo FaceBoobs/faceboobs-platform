@@ -384,7 +384,7 @@ const Messages = () => {
         console.log('✅ Loaded messages with unlock status:', messagesWithUnlockStatus);
 
         // Mark all messages from this conversation as read
-        await SupabaseService.markMessagesAsRead(account, otherAddress);
+        const markResult = await SupabaseService.markMessagesAsRead(account, otherAddress);
         console.log('✅ Messages marked as read');
 
         setMessages(messagesWithUnlockStatus);
@@ -395,6 +395,12 @@ const Messages = () => {
             ? { ...conv, unread: false, unreadCount: 0 }
             : conv
         ));
+
+        // Trigger a refresh of the navbar badge count
+        if (markResult.success) {
+          window.dispatchEvent(new CustomEvent('refreshUnreadCount'));
+          console.log('🔔 Triggered navbar badge refresh');
+        }
       } else {
         console.error('❌ Failed to load messages:', result.error);
         const errorMessage = typeof result.error === 'string'
