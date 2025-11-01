@@ -82,6 +82,34 @@ export const CommentsProvider = ({ children }) => {
           [contentId]: [...(prevData[contentId] || []), result.data]
         }));
 
+        // Create notification for the post creator
+        try {
+          // Get post details to find the creator
+          const postResult = await SupabaseService.getPostById(parseInt(contentId));
+          if (postResult.success && postResult.data) {
+            const post = postResult.data;
+
+            // Don't create notification if user comments on their own post
+            if (post.creator_address && post.creator_address.toLowerCase() !== userAddress.toLowerCase()) {
+              const notificationData = {
+                user_address: post.creator_address.toLowerCase(),
+                type: 'comment',
+                title: 'New Comment',
+                message: `${username} commented on your post`,
+                post_id: parseInt(contentId),
+                from_user_address: userAddress.toLowerCase(),
+                from_username: username
+              };
+
+              await SupabaseService.createNotification(notificationData);
+              console.log('✅ Comment notification created');
+            }
+          }
+        } catch (notifError) {
+          console.error('Failed to create comment notification:', notifError);
+          // Don't fail the comment operation if notification fails
+        }
+
         toast.success('💬 Comment added!');
         return { success: true, comment: result.data };
       } else {

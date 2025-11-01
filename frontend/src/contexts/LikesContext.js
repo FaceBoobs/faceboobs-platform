@@ -108,6 +108,36 @@ export const LikesProvider = ({ children }) => {
         // Show success message
         toast.success(result.action === 'liked' ? '❤️ Liked!' : '💔 Unliked');
 
+        // Create notification for the post creator (only when liking, not unliking)
+        if (result.action === 'liked') {
+          try {
+            // Get post details to find the creator
+            const postResult = await SupabaseService.getPostById(parseInt(contentId));
+            if (postResult.success && postResult.data) {
+              const post = postResult.data;
+
+              // Don't create notification if user likes their own post
+              if (post.creator_address && post.creator_address.toLowerCase() !== userAddress.toLowerCase()) {
+                const notificationData = {
+                  user_address: post.creator_address.toLowerCase(),
+                  type: 'like',
+                  title: 'New Like',
+                  message: `${user?.username || `User${userAddress.substring(0, 6)}`} liked your post`,
+                  post_id: parseInt(contentId),
+                  from_user_address: userAddress.toLowerCase(),
+                  from_username: user?.username || `User${userAddress.substring(0, 6)}`
+                };
+
+                await SupabaseService.createNotification(notificationData);
+                console.log('✅ Like notification created');
+              }
+            }
+          } catch (notifError) {
+            console.error('Failed to create like notification:', notifError);
+            // Don't fail the like operation if notification fails
+          }
+        }
+
         // Refresh the specific post's likes
         await loadPostLikes(contentId);
 

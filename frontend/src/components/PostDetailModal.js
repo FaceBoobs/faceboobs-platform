@@ -159,6 +159,30 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
 
       // Step 4: Update local state to unlock content
       setHasAccess(true);
+
+      // Step 5: Create notification for the post creator
+      try {
+        // Don't create notification if user buys their own content
+        if (content.creator && content.creator.toLowerCase() !== account.toLowerCase()) {
+          const notificationData = {
+            user_address: content.creator.toLowerCase(),
+            type: 'purchase',
+            title: 'New Purchase',
+            message: `${user?.username || `User${account.substring(0, 6)}`} purchased your content for ${content.price} BNB`,
+            post_id: parseInt(content.id),
+            from_user_address: account.toLowerCase(),
+            from_username: user?.username || `User${account.substring(0, 6)}`,
+            amount: content.price.toString()
+          };
+
+          await SupabaseService.createNotification(notificationData);
+          console.log('✅ Purchase notification created');
+        }
+      } catch (notifError) {
+        console.error('Failed to create purchase notification:', notifError);
+        // Don't fail the purchase operation if notification fails
+      }
+
       toast.success('🎉 Content purchased successfully!');
 
     } catch (error) {
