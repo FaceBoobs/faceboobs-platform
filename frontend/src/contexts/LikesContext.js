@@ -122,9 +122,9 @@ export const LikesProvider = ({ children }) => {
                   user_address: post.creator_address.toLowerCase(),
                   type: 'like',
                   title: 'New Like',
-                  message: `${user?.username || `User${userAddress.substring(0, 6)}`} liked your post`,
+                  content: `${user?.username || `User${userAddress.substring(0, 6)}`} liked your post`,
                   post_id: parseInt(contentId),
-                  from_user_address: userAddress.toLowerCase(),
+                  from_address: userAddress.toLowerCase(),
                   from_username: user?.username || `User${userAddress.substring(0, 6)}`
                 };
 

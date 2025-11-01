@@ -95,9 +95,9 @@ export const CommentsProvider = ({ children }) => {
                 user_address: post.creator_address.toLowerCase(),
                 type: 'comment',
                 title: 'New Comment',
-                message: `${username} commented on your post`,
+                content: `${username} commented on your post`,
                 post_id: parseInt(contentId),
-                from_user_address: userAddress.toLowerCase(),
+                from_address: userAddress.toLowerCase(),
                 from_username: username
               };
 
