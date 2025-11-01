@@ -1049,4 +1049,232 @@ export class SupabaseService {
       })
       .subscribe();
   }
+
+  // Message Media Purchases
+  // NOTE: Before using these methods, ensure the 'chat-media' bucket exists in Supabase Storage
+  // To create the bucket:
+  // 1. Go to Supabase Dashboard > Storage
+  // 2. Click "New bucket"
+  // 3. Name: "chat-media"
+  // 4. Public bucket: Yes (for media URLs to be accessible)
+  // 5. File size limit: 50MB
+  // 6. Allowed MIME types: image/*, video/*
+
+  /**
+   * Purchase a paid media message
+   * @param {string} buyerAddress - Address of the buyer (lowercase)
+   * @param {number} messageId - ID of the message containing the media
+   * @param {number} amount - Amount paid in BNB
+   * @param {string} txHash - Blockchain transaction hash
+   * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+   */
+  static async purchaseMessageMedia(buyerAddress, messageId, amount, txHash) {
+    try {
+      console.log('💰 Recording message media purchase:', {
+        buyerAddress,
+        messageId,
+        amount,
+        txHash
+      });
+
+      const { data, error } = await supabase
+        .from('message_purchases')
+        .insert([{
+          buyer_address: buyerAddress.toLowerCase(),
+          message_id: messageId,
+          amount: amount,
+          transaction_hash: txHash
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        // Check if error is due to duplicate purchase
+        if (error.code === '23505') {
+          console.log('⚠️ User already purchased this content');
+          return {
+            success: true,
+            alreadyPurchased: true,
+            message: 'Content already purchased'
+          };
+        }
+        throw error;
+      }
+
+      console.log('✅ Purchase recorded successfully:', data);
+      return { success: true, data };
+    } catch (error) {
+      console.error('❌ Error recording purchase:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Check if user has purchased a specific media message
+   * @param {string} buyerAddress - Address of the buyer (lowercase)
+   * @param {number} messageId - ID of the message
+   * @returns {Promise<{success: boolean, hasPurchased: boolean, error?: string}>}
+   */
+  static async hasUserPurchasedMedia(buyerAddress, messageId) {
+    try {
+      console.log('🔍 Checking if user purchased media:', {
+        buyerAddress,
+        messageId
+      });
+
+      const { data, error } = await supabase
+        .from('message_purchases')
+        .select('id')
+        .eq('buyer_address', buyerAddress.toLowerCase())
+        .eq('message_id', messageId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      const hasPurchased = !!data;
+      console.log(`${hasPurchased ? '✅' : '❌'} User ${hasPurchased ? 'has' : 'has not'} purchased this media`);
+
+      return { success: true, hasPurchased };
+    } catch (error) {
+      console.error('❌ Error checking purchase status:', error);
+      return { success: false, hasPurchased: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get all media purchases made by a user
+   * @param {string} userAddress - Address of the user (lowercase)
+   * @returns {Promise<{success: boolean, data?: array, error?: string}>}
+   */
+  static async getUserMessagePurchases(userAddress) {
+    try {
+      console.log('📊 Fetching all media purchases for user:', userAddress);
+
+      const { data, error } = await supabase
+        .from('message_purchases')
+        .select(`
+          *,
+          messages (
+            id,
+            media_url,
+            media_type,
+            price,
+            sender_address,
+            created_at
+          )
+        `)
+        .eq('buyer_address', userAddress.toLowerCase())
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      console.log('✅ Found', data?.length || 0, 'purchases');
+      return { success: true, data: data || [] };
+    } catch (error) {
+      console.error('❌ Error fetching user purchases:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Upload media file to Supabase Storage 'chat-media' bucket
+   * @param {File} file - File object to upload
+   * @param {number} messageId - ID of the message (optional, for unique naming)
+   * @returns {Promise<{success: boolean, url?: string, path?: string, error?: string}>}
+   */
+  static async uploadMessageMedia(file, messageId = null) {
+    try {
+      console.log('📤 Uploading message media to Storage:', {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        messageId
+      });
+
+      // Validate file
+      const maxSize = 50 * 1024 * 1024; // 50MB
+      if (file.size > maxSize) {
+        throw new Error('File too large. Maximum size is 50MB');
+      }
+
+      const validTypes = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'video/mp4', 'video/quicktime', 'video/webm'
+      ];
+
+      if (!validTypes.includes(file.type)) {
+        throw new Error('Invalid file type. Use JPG, PNG, GIF, WEBP for images or MP4, MOV, WEBM for videos');
+      }
+
+      // Generate unique file name
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 8);
+      const extension = file.name.split('.').pop();
+      const sanitizedName = file.name
+        .replace(/[^a-zA-Z0-9.]/g, '_')
+        .substring(0, 50); // Limit length
+
+      const fileName = messageId
+        ? `msg_${messageId}_${timestamp}_${randomStr}.${extension}`
+        : `${timestamp}_${randomStr}_${sanitizedName}`;
+
+      console.log('📝 Generated file name:', fileName);
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('chat-media')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('❌ Upload error:', error);
+        throw error;
+      }
+
+      console.log('✅ File uploaded successfully:', data);
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('chat-media')
+        .getPublicUrl(fileName);
+
+      console.log('✅ Public URL generated:', urlData.publicUrl);
+
+      return {
+        success: true,
+        url: urlData.publicUrl,
+        path: data.path
+      };
+    } catch (error) {
+      console.error('❌ Error uploading message media:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Delete media file from Supabase Storage
+   * @param {string} filePath - Path of the file in storage
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  static async deleteMessageMedia(filePath) {
+    try {
+      console.log('🗑️ Deleting message media from Storage:', filePath);
+
+      const { error } = await supabase.storage
+        .from('chat-media')
+        .remove([filePath]);
+
+      if (error) throw error;
+
+      console.log('✅ Media deleted successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error deleting message media:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }

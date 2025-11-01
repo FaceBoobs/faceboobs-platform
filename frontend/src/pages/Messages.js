@@ -1,11 +1,16 @@
 // src/pages/Messages.js
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Search, Plus, X, Loader } from 'lucide-react';
+import { Send, Search, Plus, X, Loader, Paperclip, Image as ImageIcon, Video, DollarSign, Lock } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { SupabaseService } from '../services/supabaseService';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { supabase } from '../supabaseClient';
+import { ethers } from 'ethers';
+import CONTRACT_ABI from '../contracts/SocialPlatform.json';
+
+// Smart contract configuration
+const CONTRACT_ADDRESS = "0x575e0532445489dd31C12615BeC7C63d737B69DD";
 
 const Messages = () => {
   const { user, account, loading } = useWeb3();
@@ -24,6 +29,19 @@ const Messages = () => {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const messagesEndRef = useRef(null);
   const messageSubscriptionRef = useRef(null);
+
+  // Media upload states
+  const [showMediaModal, setShowMediaModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [mediaType, setMediaType] = useState(null); // 'image' or 'video'
+  const [isPaidContent, setIsPaidContent] = useState(false);
+  const [contentPrice, setContentPrice] = useState('');
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Media unlock states
+  const [unlockingMedia, setUnlockingMedia] = useState({}); // { messageId: boolean }
 
   useEffect(() => {
     if (user && account) {
@@ -221,18 +239,44 @@ const Messages = () => {
       const result = await SupabaseService.getMessages(account, otherAddress);
 
       if (result.success) {
-        // Map messages to include only text content
-        const messages = result.data.map(message => ({
-          id: message.id,
-          sender_address: message.sender_address,
-          content: message.content,
-          created_at: message.created_at,
-          timestamp: new Date(message.created_at).getTime(),
-          isOwn: message.sender_address === account
-        }));
+        // Check unlock status for paid media messages
+        const messagesWithUnlockStatus = await Promise.all(
+          result.data.map(async (message) => {
+            let isUnlocked = true;
 
-        console.log('✅ Loaded messages:', messages);
-        setMessages(messages);
+            // If message has paid media and user is not the sender, check if unlocked
+            if (message.has_media && message.is_paid && message.sender_address !== account) {
+              const { data: purchase } = await supabase
+                .from('message_purchases')
+                .select('*')
+                .eq('message_id', message.id)
+                .eq('buyer_address', account.toLowerCase())
+                .single();
+
+              isUnlocked = !!purchase;
+              console.log(`📊 Message ${message.id} unlock status:`, isUnlocked);
+            }
+
+            return {
+              id: message.id,
+              sender_address: message.sender_address,
+              content: message.content,
+              has_media: message.has_media || false,
+              media_url: message.media_url,
+              media_type: message.media_type,
+              is_paid: message.is_paid || false,
+              price: message.price || 0,
+              blockchain_content_id: message.blockchain_content_id,
+              is_unlocked: isUnlocked,
+              created_at: message.created_at,
+              timestamp: new Date(message.created_at).getTime(),
+              isOwn: message.sender_address === account
+            };
+          })
+        );
+
+        console.log('✅ Loaded messages with unlock status:', messagesWithUnlockStatus);
+        setMessages(messagesWithUnlockStatus);
       } else {
         console.error('❌ Failed to load messages:', result.error);
         const errorMessage = typeof result.error === 'string'
@@ -321,6 +365,331 @@ const Messages = () => {
       toast.error('Failed to send message');
     } finally {
       setSendingMessage(false);
+    }
+  };
+
+  // Media upload functions
+  const handlePaperclipClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // File validation
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      toast.error('File too large. Maximum size is 50MB');
+      return;
+    }
+
+    const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const validVideoTypes = ['video/mp4', 'video/quicktime'];
+    const isValidImage = validImageTypes.includes(file.type);
+    const isValidVideo = validVideoTypes.includes(file.type);
+
+    if (!isValidImage && !isValidVideo) {
+      toast.error('Invalid file type. Please use JPG, PNG, GIF, WEBP for images or MP4, MOV for videos');
+      return;
+    }
+
+    // Set file and create preview
+    setSelectedFile(file);
+    setMediaType(isValidImage ? 'image' : 'video');
+
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+
+    // Open modal
+    setShowMediaModal(true);
+
+    console.log('✅ File selected:', file.name, file.type);
+  };
+
+  const closeMediaModal = () => {
+    setShowMediaModal(false);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setMediaType(null);
+    setIsPaidContent(false);
+    setContentPrice('');
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const uploadMediaToStorage = async (file) => {
+    try {
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      console.log('📤 Uploading file to Supabase Storage:', fileName);
+
+      const { data, error } = await supabase.storage
+        .from('chat-media')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('❌ Upload error:', error);
+        throw error;
+      }
+
+      console.log('✅ File uploaded successfully:', data);
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('chat-media')
+        .getPublicUrl(fileName);
+
+      console.log('✅ Public URL generated:', urlData.publicUrl);
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('❌ Error uploading media to storage:', error);
+      throw error;
+    }
+  };
+
+  const registerPaidContentOnBlockchain = async (mediaUrl, price) => {
+    try {
+      console.log('⛓️ Registering paid content on blockchain...');
+
+      if (!window.ethereum) {
+        throw new Error('MetaMask not installed');
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, signer);
+
+      // Convert price to wei
+      const priceInWei = ethers.parseEther(price);
+
+      console.log('📝 Creating content on blockchain:', {
+        mediaUrl,
+        priceInWei: priceInWei.toString(),
+        isPaid: true
+      });
+
+      // Call smart contract
+      const tx = await contract.createContent(mediaUrl, priceInWei, true);
+      console.log('⏳ Transaction sent:', tx.hash);
+
+      toast.info('Please wait for blockchain confirmation...');
+
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt);
+
+      // Get contentId from event
+      const contentCreatedEvent = receipt.logs.find(
+        log => log.fragment && log.fragment.name === 'ContentCreated'
+      );
+
+      if (contentCreatedEvent) {
+        const contentId = contentCreatedEvent.args[0];
+        console.log('✅ Content registered with ID:', contentId.toString());
+        return contentId.toString();
+      } else {
+        throw new Error('ContentCreated event not found in transaction');
+      }
+
+    } catch (error) {
+      console.error('❌ Blockchain registration error:', error);
+
+      if (error.code === 'ACTION_REJECTED') {
+        throw new Error('Transaction was rejected by user');
+      } else if (error.message?.includes('Only creators can create content')) {
+        throw new Error('You need to be registered as a creator. Please upgrade your account first.');
+      }
+
+      throw error;
+    }
+  };
+
+  const handleSendMedia = async () => {
+    if (!selectedFile || !activeChat || !account) {
+      toast.error('Missing required information');
+      return;
+    }
+
+    if (isPaidContent && (!contentPrice || parseFloat(contentPrice) <= 0)) {
+      toast.error('Please enter a valid price');
+      return;
+    }
+
+    try {
+      setUploadingMedia(true);
+      console.log('📤 Starting media upload process...');
+
+      // Step 1: Upload to Supabase Storage
+      const mediaUrl = await uploadMediaToStorage(selectedFile);
+      console.log('✅ Media uploaded to storage');
+
+      let blockchainContentId = null;
+
+      // Step 2: If paid, register on blockchain
+      if (isPaidContent) {
+        toast.info('Registering content on blockchain...');
+        blockchainContentId = await registerPaidContentOnBlockchain(mediaUrl, contentPrice);
+        console.log('✅ Content registered on blockchain with ID:', blockchainContentId);
+      }
+
+      // Step 3: Save message to database
+      const messageData = {
+        sender_address: account.toLowerCase(),
+        receiver_address: activeChat.address.toLowerCase(),
+        content: newMessage.trim() || '',
+        has_media: true,
+        media_url: mediaUrl,
+        media_type: mediaType,
+        is_paid: isPaidContent,
+        price: isPaidContent ? parseFloat(contentPrice) : 0,
+        blockchain_content_id: blockchainContentId
+      };
+
+      console.log('💾 Saving message to database:', messageData);
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([messageData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
+
+      console.log('✅ Message saved to database:', data);
+
+      // Clear form and close modal
+      setNewMessage('');
+      closeMediaModal();
+
+      // Update conversations
+      setConversations(prev => prev.map(conv =>
+        conv.address === activeChat.address
+          ? {
+              ...conv,
+              lastMessage: isPaidContent ? '💰 Paid media' : '📷 Media',
+              timestamp: Date.now()
+            }
+          : conv
+      ));
+
+      // Reload messages
+      await loadMessages(activeChat.address);
+
+      toast.success(isPaidContent
+        ? 'Paid content sent and registered on blockchain!'
+        : 'Media sent successfully!');
+
+    } catch (error) {
+      console.error('❌ Error sending media:', error);
+      toast.error(error.message || 'Failed to send media');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  // Unlock paid media content
+  const handleUnlockMedia = async (message) => {
+    if (!message || !message.blockchain_content_id) {
+      toast.error('Invalid content');
+      return;
+    }
+
+    // Confirm purchase
+    const confirmed = window.confirm(
+      `Unlock this ${message.media_type} for ${message.price} BNB?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setUnlockingMedia(prev => ({ ...prev, [message.id]: true }));
+      console.log('🔓 Unlocking media:', {
+        messageId: message.id,
+        blockchainContentId: message.blockchain_content_id,
+        price: message.price
+      });
+
+      if (!window.ethereum) {
+        throw new Error('MetaMask not installed');
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, signer);
+
+      // Convert price to wei
+      const priceInWei = ethers.parseEther(message.price.toString());
+
+      console.log('💰 Purchasing content:', {
+        contentId: message.blockchain_content_id,
+        priceInWei: priceInWei.toString()
+      });
+
+      toast.info('Please confirm the transaction in MetaMask...');
+
+      // Call buyContent on smart contract
+      const tx = await contract.buyContent(message.blockchain_content_id, {
+        value: priceInWei
+      });
+
+      console.log('⏳ Transaction sent:', tx.hash);
+      toast.info('Processing payment on blockchain...');
+
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt);
+
+      // Save purchase in database
+      console.log('💾 Saving purchase to database...');
+      const { error: purchaseError } = await supabase
+        .from('message_purchases')
+        .insert([{
+          message_id: message.id,
+          buyer_address: account.toLowerCase(),
+          amount: message.price,
+          transaction_hash: tx.hash
+        }]);
+
+      if (purchaseError) {
+        // Check if error is due to duplicate (already purchased)
+        if (purchaseError.code === '23505') {
+          console.log('⚠️ Already purchased, reloading messages...');
+        } else {
+          console.error('❌ Purchase record error:', purchaseError);
+          throw purchaseError;
+        }
+      }
+
+      console.log('✅ Purchase recorded successfully');
+      toast.success('Content unlocked! 🎉');
+
+      // Reload messages to show unlocked content
+      await loadMessages(activeChat.address);
+
+    } catch (error) {
+      console.error('❌ Unlock error:', error);
+
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        toast.error('Transaction cancelled');
+      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.message?.includes('insufficient funds')) {
+        toast.error('Insufficient funds in your wallet');
+      } else if (error.message?.includes('Already purchased') || error.code === '23505') {
+        toast.info('You already own this content');
+        await loadMessages(activeChat.address);
+      } else {
+        toast.error(error.message || 'Failed to unlock content');
+      }
+    } finally {
+      setUnlockingMedia(prev => ({ ...prev, [message.id]: false }));
     }
   };
 
@@ -551,8 +920,86 @@ const Messages = () => {
                         : 'bg-gray-200 text-gray-900'
                     }`}
                   >
+                    {/* Media Content */}
+                    {message.has_media && message.media_url && (
+                      <div className="mb-2">
+                        {/* Paid Media - Locked */}
+                        {message.is_paid && !message.is_unlocked && !message.isOwn ? (
+                          <div className="relative">
+                            {/* Blurred Preview */}
+                            <div className="relative overflow-hidden rounded">
+                              {message.media_type === 'image' ? (
+                                <img
+                                  src={message.media_url}
+                                  alt="Locked content"
+                                  className="w-full max-h-48 object-cover blur-lg"
+                                />
+                              ) : (
+                                <video
+                                  src={message.media_url}
+                                  className="w-full max-h-48 object-cover blur-lg"
+                                />
+                              )}
+                            </div>
+                            {/* Lock Overlay */}
+                            <div
+                              className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center rounded cursor-pointer hover:bg-opacity-70 transition-all"
+                              onClick={() => handleUnlockMedia(message)}
+                            >
+                              {unlockingMedia[message.id] ? (
+                                <Loader className="animate-spin text-white mb-2" size={32} />
+                              ) : (
+                                <Lock className="text-white mb-2" size={32} />
+                              )}
+                              <p className="text-white font-bold text-sm">Locked Content</p>
+                              <p className="text-white text-xs mt-1">
+                                Unlock for {message.price} BNB
+                              </p>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUnlockMedia(message);
+                                }}
+                                disabled={unlockingMedia[message.id]}
+                                className="mt-2 px-4 py-1 bg-blue-600 text-white text-sm rounded-full hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                              >
+                                {unlockingMedia[message.id] ? 'Unlocking...' : 'Buy Now'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Free Media or Unlocked Paid Media */
+                          <div>
+                            {message.media_type === 'image' ? (
+                              <img
+                                src={message.media_url}
+                                alt="Media"
+                                className="w-full max-h-64 object-cover rounded cursor-pointer"
+                                onClick={() => window.open(message.media_url, '_blank')}
+                              />
+                            ) : (
+                              <video
+                                src={message.media_url}
+                                controls
+                                className="w-full max-h-64 rounded"
+                              />
+                            )}
+                            {/* Paid badge for sender */}
+                            {message.is_paid && message.isOwn && (
+                              <div className="flex items-center gap-1 mt-1 text-xs opacity-75">
+                                <DollarSign size={12} />
+                                <span>{message.price} BNB</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Text content */}
-                    <p className="text-sm">{message.content}</p>
+                    {message.content && (
+                      <p className="text-sm">{message.content}</p>
+                    )}
 
                     {/* Timestamp */}
                     <p className={`text-xs mt-1 ${
@@ -567,8 +1014,27 @@ const Messages = () => {
             </div>
 
             <div className="p-4 border-t border-gray-200">
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
               {/* Input form */}
               <form onSubmit={sendMessage} className="flex items-center gap-2">
+                {/* Paperclip button */}
+                <button
+                  type="button"
+                  onClick={handlePaperclipClick}
+                  className="text-gray-500 hover:text-blue-500 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  title="Attach media"
+                >
+                  <Paperclip size={20} />
+                </button>
+
                 {/* Text input */}
                 <input
                   type="text"
@@ -688,6 +1154,158 @@ const Messages = () => {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Media Upload Modal */}
+      {showMediaModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeMediaModal();
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {mediaType === 'image' ? (
+                  <ImageIcon className="text-blue-500" size={24} />
+                ) : (
+                  <Video className="text-blue-500" size={24} />
+                )}
+                <h2 className="text-xl font-bold text-gray-900">Send Media</h2>
+              </div>
+              <button
+                onClick={closeMediaModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                disabled={uploadingMedia}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Media Preview */}
+              <div className="mb-6">
+                <div className="relative rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center" style={{ maxHeight: '400px' }}>
+                  {mediaType === 'image' ? (
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="max-w-full max-h-[400px] object-contain"
+                    />
+                  ) : (
+                    <video
+                      src={previewUrl}
+                      controls
+                      className="max-w-full max-h-[400px] object-contain"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Optional Caption */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Caption (optional)
+                </label>
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Add a caption..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={uploadingMedia}
+                />
+              </div>
+
+              {/* Paid Content Toggle */}
+              <div className="mb-6 bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="text-green-600" size={20} />
+                    <span className="font-medium text-gray-900">Paid Content</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPaidContent(!isPaidContent)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      isPaidContent ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                    disabled={uploadingMedia}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        isPaidContent ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {isPaidContent && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Price in BNB
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        value={contentPrice}
+                        onChange={(e) => setContentPrice(e.target.value)}
+                        placeholder="0.01"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={uploadingMedia}
+                      />
+                      <span className="text-sm font-medium text-gray-600">BNB</span>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      Content will be registered on blockchain and only accessible after payment
+                    </p>
+                  </div>
+                )}
+
+                {!isPaidContent && (
+                  <p className="text-sm text-gray-600">
+                    This content will be free and immediately visible to the recipient
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-200 flex items-center justify-between">
+              <button
+                onClick={closeMediaModal}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={uploadingMedia}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendMedia}
+                disabled={uploadingMedia || (isPaidContent && (!contentPrice || parseFloat(contentPrice) <= 0))}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {uploadingMedia ? (
+                  <>
+                    <Loader className="animate-spin" size={20} />
+                    <span>{isPaidContent ? 'Uploading & Registering...' : 'Uploading...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={20} />
+                    <span>Send</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
