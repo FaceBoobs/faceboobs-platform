@@ -1050,6 +1050,147 @@ export class SupabaseService {
       .subscribe();
   }
 
+  // Count unread messages for a user
+  static async countUnreadMessages(userAddress) {
+    try {
+      console.log('🔄 Counting unread messages for user:', userAddress);
+
+      // Count messages where user is receiver and is_read is false
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_address', userAddress.toLowerCase())
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      console.log('✅ Unread messages count:', count);
+      return { success: true, count: count || 0 };
+    } catch (error) {
+      console.error('❌ Error counting unread messages:', error);
+      return { success: false, error: error.message, count: 0 };
+    }
+  }
+
+  // Count unread messages from a specific sender
+  static async countUnreadMessagesFromSender(receiverAddress, senderAddress) {
+    try {
+      console.log('🔄 Counting unread messages from:', senderAddress, 'to:', receiverAddress);
+
+      // Count messages where user is receiver, sender is specific user, and is_read is false
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_address', receiverAddress.toLowerCase())
+        .eq('sender_address', senderAddress.toLowerCase())
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      console.log('✅ Unread messages from sender count:', count);
+      return { success: true, count: count || 0 };
+    } catch (error) {
+      console.error('❌ Error counting unread messages from sender:', error);
+      return { success: false, error: error.message, count: 0 };
+    }
+  }
+
+  // Mark all messages from a specific sender as read
+  static async markMessagesAsRead(receiverAddress, senderAddress) {
+    try {
+      console.log('🔄 Marking messages as read from:', senderAddress, 'to:', receiverAddress);
+
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('receiver_address', receiverAddress.toLowerCase())
+        .eq('sender_address', senderAddress.toLowerCase())
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      console.log('✅ Messages marked as read');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error marking messages as read:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Mark a single message as read by message ID
+  static async markMessageAsRead(messageId) {
+    try {
+      console.log('🔄 Marking message as read:', messageId);
+
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('id', messageId)
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      console.log('✅ Message marked as read');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error marking message as read:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get list of conversations with unread messages
+  static async getUnreadConversations(userAddress) {
+    try {
+      console.log('🔄 Getting unread conversations for user:', userAddress);
+
+      // Get all unread messages where user is receiver
+      const { data: unreadMessages, error } = await supabase
+        .from('messages')
+        .select('sender_address, created_at')
+        .eq('receiver_address', userAddress.toLowerCase())
+        .eq('is_read', false)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group by sender and count
+      const conversationsMap = new Map();
+
+      unreadMessages?.forEach(msg => {
+        const sender = msg.sender_address;
+        if (conversationsMap.has(sender)) {
+          conversationsMap.get(sender).unreadCount += 1;
+          // Keep the most recent timestamp
+          const existingTimestamp = new Date(conversationsMap.get(sender).lastMessageAt).getTime();
+          const currentTimestamp = new Date(msg.created_at).getTime();
+          if (currentTimestamp > existingTimestamp) {
+            conversationsMap.get(sender).lastMessageAt = msg.created_at;
+          }
+        } else {
+          conversationsMap.set(sender, {
+            senderAddress: sender,
+            unreadCount: 1,
+            lastMessageAt: msg.created_at
+          });
+        }
+      });
+
+      // Convert to array
+      const conversations = Array.from(conversationsMap.values());
+
+      console.log('✅ Found', conversations.length, 'conversations with unread messages');
+      return { success: true, data: conversations };
+    } catch (error) {
+      console.error('❌ Error getting unread conversations:', error);
+      return { success: false, error: error.message, data: [] };
+    }
+  }
+
+  // Alias for countUnreadMessages with clearer name
+  static async getUnreadMessagesCount(userAddress) {
+    return this.countUnreadMessages(userAddress);
+  }
+
   // Message Media Purchases
   // NOTE: Before using these methods, ensure the 'chat-media' bucket exists in Supabase Storage
   // To create the bucket:

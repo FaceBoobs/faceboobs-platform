@@ -103,6 +103,97 @@ const Messages = () => {
     console.log('🔄 Modal state changed:', showNewChatModal);
   }, [showNewChatModal]);
 
+  // Subscribe to all user messages for conversation list updates
+  useEffect(() => {
+    if (!account) return;
+
+    console.log('📡 [Messages] Subscribing to all messages for conversation list updates');
+
+    const subscription = SupabaseService.subscribeToUserMessages(account, async (payload) => {
+      console.log('🔔 [Messages] New message event for conversation list:', payload.eventType);
+
+      // If a new message is inserted
+      if (payload.eventType === 'INSERT' && payload.new) {
+        const newMessage = payload.new;
+        const isReceiver = newMessage.receiver_address === account.toLowerCase();
+        const isSender = newMessage.sender_address === account.toLowerCase();
+        const otherAddress = isReceiver ? newMessage.sender_address : newMessage.receiver_address;
+
+        console.log('📩 [Messages] New message:', {
+          from: newMessage.sender_address,
+          to: newMessage.receiver_address,
+          isReceiver,
+          isSender,
+          otherAddress
+        });
+
+        // Update conversations
+        setConversations(prev => {
+          const existingConv = prev.find(c => c.address === otherAddress);
+
+          if (existingConv) {
+            // Update existing conversation
+            const updatedConvs = prev.map(conv => {
+              if (conv.address === otherAddress) {
+                // If user is the receiver and not currently viewing this chat, increment unread
+                const shouldIncrementUnread = isReceiver && activeChat?.address !== otherAddress;
+
+                return {
+                  ...conv,
+                  lastMessage: newMessage.content || '💬 New message',
+                  timestamp: new Date(newMessage.created_at).getTime(),
+                  unread: shouldIncrementUnread || conv.unread,
+                  unreadCount: shouldIncrementUnread ? (conv.unreadCount || 0) + 1 : conv.unreadCount
+                };
+              }
+              return conv;
+            });
+
+            // Re-sort conversations: unread first, then by timestamp
+            return updatedConvs.sort((a, b) => {
+              if (a.unread && !b.unread) return -1;
+              if (!a.unread && b.unread) return 1;
+              return b.timestamp - a.timestamp;
+            });
+          } else {
+            // New conversation - reload conversations to get user data
+            loadConversations();
+            return prev;
+          }
+        });
+      }
+
+      // If messages are updated (marked as read)
+      if (payload.eventType === 'UPDATE' && payload.new && payload.old) {
+        const oldMessage = payload.old;
+        const newMessage = payload.new;
+
+        // If message was unread and now is read, decrement the unread count
+        if (oldMessage.receiver_address === account.toLowerCase() &&
+            !oldMessage.is_read && newMessage.is_read) {
+          console.log('✅ [Messages] Message marked as read, updating conversation list');
+
+          setConversations(prev => prev.map(conv => {
+            if (conv.address === newMessage.sender_address) {
+              const newUnreadCount = Math.max(0, (conv.unreadCount || 0) - 1);
+              return {
+                ...conv,
+                unread: newUnreadCount > 0,
+                unreadCount: newUnreadCount
+              };
+            }
+            return conv;
+          }));
+        }
+      }
+    });
+
+    return () => {
+      console.log('🔌 [Messages] Unsubscribing from conversation list updates');
+      subscription?.unsubscribe();
+    };
+  }, [account, activeChat]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -151,32 +242,47 @@ const Messages = () => {
         const users = userResult.success ? userResult.data : [];
 
         // Convert map to array and add user data
-        const conversationsWithUserData = Array.from(conversationsMap.values()).map(conv => {
-          // Find user by wallet_address or address field
-          const otherUser = users.find(u => {
-            const userAddr = (u.wallet_address || u.address)?.toLowerCase();
-            return userAddr === conv.address?.toLowerCase();
-          });
+        const conversationsWithUserData = await Promise.all(
+          Array.from(conversationsMap.values()).map(async conv => {
+            // Find user by wallet_address or address field
+            const otherUser = users.find(u => {
+              const userAddr = (u.wallet_address || u.address)?.toLowerCase();
+              return userAddr === conv.address?.toLowerCase();
+            });
 
-          console.log('🔍 Matching user for conversation:', {
-            convAddress: conv.address,
-            foundUser: otherUser?.username,
-            userAddress: otherUser?.wallet_address || otherUser?.address
-          });
+            console.log('🔍 Matching user for conversation:', {
+              convAddress: conv.address,
+              foundUser: otherUser?.username,
+              userAddress: otherUser?.wallet_address || otherUser?.address
+            });
 
-          return {
-            id: conv.address, // Use address as unique ID
-            username: otherUser?.username || `User${conv.address?.substring(0, 6)}`,
-            address: conv.address,
-            lastMessage: conv.lastMessage?.content || 'No messages yet',
-            timestamp: conv.lastTimestamp,
-            unread: false, // TODO: Implement unread logic
-            avatar: otherUser?.username?.charAt(0).toUpperCase() || '👤'
-          };
+            // Count unread messages from this conversation
+            const unreadResult = await SupabaseService.countUnreadMessagesFromSender(account, conv.address);
+            const unreadCount = unreadResult.success ? unreadResult.count : 0;
+
+            console.log('📊 Unread messages from', conv.address, ':', unreadCount);
+
+            return {
+              id: conv.address, // Use address as unique ID
+              username: otherUser?.username || `User${conv.address?.substring(0, 6)}`,
+              address: conv.address,
+              lastMessage: conv.lastMessage?.content || 'No messages yet',
+              timestamp: conv.lastTimestamp,
+              unread: unreadCount > 0,
+              unreadCount: unreadCount,
+              avatar: otherUser?.username?.charAt(0).toUpperCase() || '👤'
+            };
+          })
+        );
+
+        // Sort: conversations with unread messages first, then by most recent message
+        conversationsWithUserData.sort((a, b) => {
+          // First, sort by unread status (unread first)
+          if (a.unread && !b.unread) return -1;
+          if (!a.unread && b.unread) return 1;
+          // Then by timestamp (most recent first)
+          return b.timestamp - a.timestamp;
         });
-
-        // Sort by most recent message
-        conversationsWithUserData.sort((a, b) => b.timestamp - a.timestamp);
 
         console.log('✅ Loaded conversations:', conversationsWithUserData);
         setConversations(conversationsWithUserData);
@@ -276,7 +382,19 @@ const Messages = () => {
         );
 
         console.log('✅ Loaded messages with unlock status:', messagesWithUnlockStatus);
+
+        // Mark all messages from this conversation as read
+        await SupabaseService.markMessagesAsRead(account, otherAddress);
+        console.log('✅ Messages marked as read');
+
         setMessages(messagesWithUnlockStatus);
+
+        // Update the conversation's unread count in the local state
+        setConversations(prev => prev.map(conv =>
+          conv.address === otherAddress
+            ? { ...conv, unread: false, unreadCount: 0 }
+            : conv
+        ));
       } else {
         console.error('❌ Failed to load messages:', result.error);
         const errorMessage = typeof result.error === 'string'
@@ -322,7 +440,8 @@ const Messages = () => {
       const messageData = {
         sender_address: account.toLowerCase(),
         receiver_address: activeChat.address.toLowerCase(),
-        content: newMessage.trim()
+        content: newMessage.trim(),
+        is_read: false
       };
 
       console.log('📝 Message data:', messageData);
@@ -547,7 +666,8 @@ const Messages = () => {
         media_type: mediaType,
         is_paid: isPaidContent,
         price: isPaidContent ? parseFloat(contentPrice) : 0,
-        blockchain_content_id: blockchainContentId
+        blockchain_content_id: blockchainContentId,
+        is_read: false
       };
 
       console.log('💾 Saving message to database:', messageData);
@@ -861,35 +981,51 @@ const Messages = () => {
               <p className="text-sm text-gray-400">Start a new chat to connect with creators</p>
             </div>
           ) : (
-            filteredConversations.map((conversation) => (
-              <button
-                key={conversation.address}
-                onClick={() => setActiveChat(conversation)}
-                className={`w-full p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors text-left ${
-                  activeChat?.address === conversation.address ? 'bg-blue-50 border-blue-200' : ''
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="text-2xl">{conversation.avatar}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-medium text-gray-900 truncate">
-                        {conversation.username}
-                      </h3>
-                      <span className="text-xs text-gray-500">
-                        {formatTime(conversation.timestamp)}
-                      </span>
+            filteredConversations.map((conversation) => {
+              const isActive = activeChat?.address === conversation.address;
+              const hasUnread = conversation.unread && conversation.unreadCount > 0;
+
+              return (
+                <button
+                  key={conversation.address}
+                  onClick={() => setActiveChat(conversation)}
+                  className={`w-full p-4 border-b border-gray-100 transition-colors text-left ${
+                    isActive
+                      ? 'bg-blue-50 border-blue-200'
+                      : hasUnread
+                      ? 'bg-pink-50 hover:bg-pink-100'
+                      : 'hover:bg-gray-50'
+                  }`}
+                  style={
+                    !isActive && hasUnread
+                      ? { backgroundColor: 'rgba(255, 143, 218, 0.2)' }
+                      : undefined
+                  }
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="text-2xl">{conversation.avatar}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className={`text-gray-900 truncate ${hasUnread ? 'font-bold' : 'font-medium'}`}>
+                          {conversation.username}
+                        </h3>
+                        <span className="text-xs text-gray-500">
+                          {formatTime(conversation.timestamp)}
+                        </span>
+                      </div>
+                      <p className={`text-sm text-gray-600 truncate ${hasUnread ? 'font-semibold' : ''}`}>
+                        {conversation.lastMessage}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-600 truncate">
-                      {conversation.lastMessage}
-                    </p>
+                    {hasUnread && (
+                      <div className="bg-pink-500 text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1.5">
+                        {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                      </div>
+                    )}
                   </div>
-                  {conversation.unread && (
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  )}
-                </div>
-              </button>
-            ))
+                </button>
+              );
+            })
           )}
         </div>
       </div>

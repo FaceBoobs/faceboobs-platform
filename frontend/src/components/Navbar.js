@@ -1,17 +1,76 @@
 // src/components/Navbar.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Search, Home, MessageCircle, User, PlusSquare, DollarSign, LogOut } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
+import { SupabaseService } from '../services/supabaseService';
 
 const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loading }) => {
   const location = useLocation();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   const formatAddress = (address) => {
     if (!address) return '';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
+
+  // Load initial unread messages count
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      if (!account) {
+        setUnreadMessagesCount(0);
+        return;
+      }
+
+      const result = await SupabaseService.countUnreadMessages(account);
+      if (result.success) {
+        setUnreadMessagesCount(result.count);
+      }
+    };
+
+    loadUnreadCount();
+  }, [account]);
+
+  // Subscribe to real-time message updates
+  useEffect(() => {
+    if (!account) return;
+
+    console.log('📡 [Navbar] Subscribing to real-time messages for:', account);
+
+    const subscription = SupabaseService.subscribeToUserMessages(account, (payload) => {
+      console.log('🔔 [Navbar] New message event:', payload.eventType);
+
+      // If a new message is inserted and user is the receiver
+      if (payload.eventType === 'INSERT' && payload.new) {
+        const newMessage = payload.new;
+
+        // If current user is the receiver and message is not read
+        if (newMessage.receiver_address === account.toLowerCase() && !newMessage.is_read) {
+          console.log('📩 [Navbar] New unread message received, incrementing count');
+          setUnreadMessagesCount(prev => prev + 1);
+        }
+      }
+
+      // If messages are updated (marked as read)
+      if (payload.eventType === 'UPDATE' && payload.new && payload.old) {
+        const oldMessage = payload.old;
+        const newMessage = payload.new;
+
+        // If message was unread and now is read, and current user was the receiver
+        if (oldMessage.receiver_address === account.toLowerCase() &&
+            !oldMessage.is_read && newMessage.is_read) {
+          console.log('✅ [Navbar] Message marked as read, decrementing count');
+          setUnreadMessagesCount(prev => Math.max(0, prev - 1));
+        }
+      }
+    });
+
+    return () => {
+      console.log('🔌 [Navbar] Unsubscribing from messages');
+      subscription?.unsubscribe();
+    };
+  }, [account]);
 
   const navItems = [
     { icon: Home, label: 'Home', path: '/' },
@@ -46,17 +105,27 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
+                const isMessages = item.path === '/messages';
+                const showBadge = isMessages && unreadMessagesCount > 0;
+
                 return (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
-                      isActive 
-                        ? 'bg-blue-50 text-blue-600' 
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors relative ${
+                      isActive
+                        ? 'bg-blue-50 text-blue-600'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                     }`}
                   >
-                    <Icon size={20} />
+                    <div className="relative">
+                      <Icon size={20} />
+                      {showBadge && (
+                        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                          {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                        </div>
+                      )}
+                    </div>
                     <span className="font-medium">{item.label}</span>
                   </Link>
                 );
@@ -153,17 +222,27 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
+                const isMessages = item.path === '/messages';
+                const showBadge = isMessages && unreadMessagesCount > 0;
+
                 return (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
-                      isActive 
-                        ? 'text-blue-600' 
+                    className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors relative ${
+                      isActive
+                        ? 'text-blue-600'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
-                    <Icon size={20} />
+                    <div className="relative">
+                      <Icon size={20} />
+                      {showBadge && (
+                        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1">
+                          {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                        </div>
+                      )}
+                    </div>
                     <span className="text-xs font-medium">{item.label}</span>
                   </Link>
                 );
