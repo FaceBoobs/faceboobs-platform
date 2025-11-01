@@ -1,12 +1,11 @@
 // src/pages/Messages.js
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Search, Plus, X, Image, DollarSign, Lock, Loader } from 'lucide-react';
+import { Send, Search, Plus, X, Loader } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { SupabaseService } from '../services/supabaseService';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { supabase } from '../supabaseClient';
-import { ethers } from 'ethers';
 
 const Messages = () => {
   const { user, account, loading } = useWeb3();
@@ -25,14 +24,6 @@ const Messages = () => {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const messagesEndRef = useRef(null);
   const messageSubscriptionRef = useRef(null);
-
-  // Media upload states
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [isPaidMedia, setIsPaidMedia] = useState(false);
-  const [mediaPrice, setMediaPrice] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [unlockingMedia, setUnlockingMedia] = useState({});
 
   useEffect(() => {
     if (user && account) {
@@ -230,41 +221,18 @@ const Messages = () => {
       const result = await SupabaseService.getMessages(account, otherAddress);
 
       if (result.success) {
-        // Check unlock status for paid messages
-        const messagesWithStatus = await Promise.all(
-          result.data.map(async (message) => {
-            let isUnlocked = true;
+        // Map messages to include only text content
+        const messages = result.data.map(message => ({
+          id: message.id,
+          sender_address: message.sender_address,
+          content: message.content,
+          created_at: message.created_at,
+          timestamp: new Date(message.created_at).getTime(),
+          isOwn: message.sender_address === account
+        }));
 
-            // If message is paid and user is not the sender, check if unlocked
-            if (message.is_paid && message.sender_address !== account) {
-              const { data: purchase } = await supabase
-                .from('message_purchases')
-                .select('*')
-                .eq('message_id', message.id)
-                .eq('buyer_address', account.toLowerCase())
-                .single();
-
-              isUnlocked = !!purchase;
-            }
-
-            return {
-              id: message.id,
-              sender_address: message.sender_address,
-              content: message.content,
-              media_url: message.media_url,
-              media_type: message.media_type,
-              is_paid: message.is_paid || false,
-              price: message.price || 0,
-              is_unlocked: isUnlocked,
-              created_at: message.created_at,
-              timestamp: new Date(message.created_at).getTime(),
-              isOwn: message.sender_address === account
-            };
-          })
-        );
-
-        console.log('✅ Loaded messages with unlock status:', messagesWithStatus);
-        setMessages(messagesWithStatus);
+        console.log('✅ Loaded messages:', messages);
+        setMessages(messages);
       } else {
         console.error('❌ Failed to load messages:', result.error);
         const errorMessage = typeof result.error === 'string'
@@ -283,139 +251,12 @@ const Messages = () => {
     }
   };
 
-  // Handle file selection
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Validation
-    const maxSize = 50 * 1024 * 1024; // 50MB
-    if (file.size > maxSize) {
-      toast.error('File too large. Max 50MB');
-      return;
-    }
-
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/quicktime', 'video/webm'];
-    if (!validTypes.includes(file.type)) {
-      toast.error('Invalid file type. Use jpg, png, gif, mp4, or mov');
-      return;
-    }
-
-    setSelectedFile(file);
-
-    // Create preview
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    console.log('✅ File selected:', file.name, file.type);
-  };
-
-  // Clear file selection
-  const clearFileSelection = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    setIsPaidMedia(false);
-    setMediaPrice('');
-  };
-
-  // Upload media to Supabase Storage
-  const uploadMedia = async (file) => {
-    try {
-      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      console.log('🔵 Uploading file to chat-media bucket:', fileName);
-
-      const { data, error } = await supabase.storage
-        .from('chat-media')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (error) {
-        console.error('❌ Upload error:', error);
-        throw error;
-      }
-
-      console.log('✅ File uploaded:', data);
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('chat-media')
-        .getPublicUrl(fileName);
-
-      console.log('✅ Public URL:', urlData.publicUrl);
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('❌ Error uploading media:', error);
-      throw error;
-    }
-  };
-
-  // Unlock paid media
-  const handleUnlockMedia = async (message) => {
-    try {
-      setUnlockingMedia(prev => ({ ...prev, [message.id]: true }));
-      console.log('🔵 Unlocking media for message:', message.id);
-
-      // For demo purposes, we'll skip the blockchain transaction
-      // In production, uncomment this:
-      /*
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-
-      const tx = await contract.purchaseContent(
-        message.id,
-        { value: ethers.parseEther(message.price.toString()) }
-      );
-
-      toast.info('Processing payment...');
-      await tx.wait();
-      */
-
-      // For now, just mark as unlocked in database
-      console.log('🔵 Marking as unlocked in database...');
-
-      // Record purchase
-      const { error: purchaseError } = await supabase
-        .from('message_purchases')
-        .insert([{
-          message_id: message.id,
-          buyer_address: account.toLowerCase(),
-          price: message.price
-        }]);
-
-      if (purchaseError) {
-        console.error('❌ Purchase error:', purchaseError);
-        throw purchaseError;
-      }
-
-      console.log('✅ Purchase recorded');
-      toast.success(`Content unlocked! (Demo mode - no actual payment)`);
-
-      // Reload messages to show unlocked content
-      await loadMessages(activeChat.address);
-
-    } catch (error) {
-      console.error('❌ Unlock error:', error);
-      if (error.code === 'ACTION_REJECTED') {
-        toast.error('Transaction cancelled');
-      } else if (error.code === '23505') {
-        toast.info('You already own this content');
-        await loadMessages(activeChat.address);
-      } else {
-        toast.error('Failed to unlock content');
-      }
-    } finally {
-      setUnlockingMedia(prev => ({ ...prev, [message.id]: false }));
-    }
-  };
-
   const sendMessage = async (e) => {
     e.preventDefault();
 
     // Validation
-    if (!newMessage.trim() && !selectedFile) {
-      console.log('❌ No message or file to send');
+    if (!newMessage.trim()) {
+      console.log('❌ No message to send');
       return;
     }
 
@@ -429,48 +270,20 @@ const Messages = () => {
       return;
     }
 
-    // Validate paid media
-    if (isPaidMedia && (!mediaPrice || parseFloat(mediaPrice) <= 0)) {
-      toast.error('Please enter a valid price');
-      return;
-    }
-
     try {
-      setUploading(true);
+      setSendingMessage(true);
       console.log('📤 Sending message...');
 
-      let mediaUrl = null;
-      let mediaType = null;
-
-      // Upload media if present
-      if (selectedFile) {
-        console.log('🔵 Uploading media...');
-        try {
-          mediaUrl = await uploadMedia(selectedFile);
-          mediaType = selectedFile.type.startsWith('image/') ? 'image' : 'video';
-          console.log('✅ Media uploaded:', mediaUrl);
-        } catch (uploadError) {
-          console.error('❌ Media upload failed:', uploadError);
-          toast.error('Failed to upload media. Please try again.');
-          setUploading(false);
-          return;
-        }
-      }
-
-      // Prepare message data
+      // Prepare message data (text only)
       const messageData = {
         sender_address: account.toLowerCase(),
         receiver_address: activeChat.address.toLowerCase(),
-        content: newMessage.trim() || '',
-        media_url: mediaUrl,
-        media_type: mediaType,
-        is_paid: isPaidMedia,
-        price: isPaidMedia ? parseFloat(mediaPrice) : 0
+        content: newMessage.trim()
       };
 
       console.log('📝 Message data:', messageData);
 
-      // Send message using Supabase directly (includes media fields)
+      // Send message using Supabase
       const { data, error } = await supabase
         .from('messages')
         .insert([messageData])
@@ -486,14 +299,13 @@ const Messages = () => {
 
       // Clear form
       setNewMessage('');
-      clearFileSelection();
 
       // Update conversations
       setConversations(prev => prev.map(conv =>
         conv.address === activeChat.address
           ? {
               ...conv,
-              lastMessage: messageData.content || (mediaUrl ? '📷 Photo' : 'Message'),
+              lastMessage: messageData.content,
               timestamp: Date.now()
             }
           : conv
@@ -502,13 +314,12 @@ const Messages = () => {
       // Reload messages
       await loadMessages(activeChat.address);
 
-      toast.success(isPaidMedia ? 'Paid content sent!' : 'Message sent!');
+      toast.success('Message sent!');
 
     } catch (error) {
       console.error('❌ Error sending message:', error);
       toast.error('Failed to send message');
     } finally {
-      setUploading(false);
       setSendingMessage(false);
     }
   };
@@ -740,74 +551,8 @@ const Messages = () => {
                         : 'bg-gray-200 text-gray-900'
                     }`}
                   >
-                    {/* PAID MEDIA - LOCKED */}
-                    {message.is_paid && !message.is_unlocked && !message.isOwn && message.media_url ? (
-                      <div className="relative mb-2">
-                        {/* Blurred preview */}
-                        <div className="relative overflow-hidden rounded">
-                          {message.media_type === 'image' ? (
-                            <img
-                              src={message.media_url}
-                              alt="Locked content"
-                              className="w-full max-h-48 object-cover blur-lg"
-                            />
-                          ) : (
-                            <video
-                              src={message.media_url}
-                              className="w-full max-h-48 object-cover blur-lg"
-                            />
-                          )}
-                        </div>
-                        {/* Lock overlay */}
-                        <div
-                          className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center rounded cursor-pointer hover:bg-opacity-70 transition-all"
-                          onClick={() => handleUnlockMedia(message)}
-                        >
-                          {unlockingMedia[message.id] ? (
-                            <Loader className="animate-spin text-white mb-2" size={32} />
-                          ) : (
-                            <Lock className="text-white mb-2" size={32} />
-                          )}
-                          <p className="text-white font-bold text-sm">Locked Content</p>
-                          <p className="text-white text-xs mt-1">
-                            Unlock for {message.price} BNB
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      /* MEDIA UNLOCKED OR FREE */
-                      message.media_url && (
-                        <div className="mb-2">
-                          {message.media_type === 'image' ? (
-                            <img
-                              src={message.media_url}
-                              alt="Media"
-                              className="w-full max-h-64 object-cover rounded cursor-pointer"
-                              onClick={() => window.open(message.media_url, '_blank')}
-                            />
-                          ) : (
-                            <video
-                              src={message.media_url}
-                              controls
-                              className="w-full max-h-64 rounded"
-                            />
-                          )}
-                        </div>
-                      )
-                    )}
-
                     {/* Text content */}
-                    {message.content && (
-                      <p className="text-sm">{message.content}</p>
-                    )}
-
-                    {/* Paid badge for sender */}
-                    {message.is_paid && message.isOwn && (
-                      <div className="flex items-center gap-1 mt-1 text-xs opacity-75">
-                        <DollarSign size={12} />
-                        <span>{message.price} BNB</span>
-                      </div>
-                    )}
+                    <p className="text-sm">{message.content}</p>
 
                     {/* Timestamp */}
                     <p className={`text-xs mt-1 ${
@@ -822,71 +567,8 @@ const Messages = () => {
             </div>
 
             <div className="p-4 border-t border-gray-200">
-              {/* File preview */}
-              {previewUrl && (
-                <div className="mb-3 relative inline-block">
-                  {selectedFile?.type.startsWith('image/') ? (
-                    <img src={previewUrl} alt="Preview" className="max-h-32 rounded-lg" />
-                  ) : (
-                    <video src={previewUrl} className="max-h-32 rounded-lg" controls />
-                  )}
-                  <button
-                    onClick={clearFileSelection}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
-
-              {/* Paid media options */}
-              {selectedFile && (
-                <div className="mb-3 flex items-center gap-4 flex-wrap">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isPaidMedia}
-                      onChange={(e) => setIsPaidMedia(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span className="text-sm text-gray-700">Make this paid content</span>
-                  </label>
-
-                  {isPaidMedia && (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        value={mediaPrice}
-                        onChange={(e) => setMediaPrice(e.target.value)}
-                        placeholder="0.01"
-                        className="border rounded px-3 py-1 w-24 text-sm"
-                      />
-                      <span className="text-sm text-gray-600">BNB</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Input form */}
               <form onSubmit={sendMessage} className="flex items-center gap-2">
-                {/* Media upload button */}
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="media-upload"
-                  disabled={uploading}
-                />
-                <label
-                  htmlFor="media-upload"
-                  className="cursor-pointer text-gray-500 hover:text-blue-500 p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <Image size={24} />
-                </label>
-
                 {/* Text input */}
                 <input
                   type="text"
@@ -894,16 +576,16 @@ const Messages = () => {
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Type a message..."
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={uploading}
+                  disabled={sendingMessage}
                 />
 
                 {/* Send button */}
                 <button
                   type="submit"
-                  disabled={(!newMessage.trim() && !selectedFile) || uploading}
+                  disabled={!newMessage.trim() || sendingMessage}
                   className="bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {uploading ? (
+                  {sendingMessage ? (
                     <Loader className="animate-spin" size={20} />
                   ) : (
                     <Send size={20} />
