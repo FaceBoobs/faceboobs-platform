@@ -387,12 +387,19 @@ export const Web3Provider = ({ children }) => {
 
       // If new avatar file is uploaded
       if (avatarFile) {
-        console.log('📤 Uploading avatar to Supabase Storage...');
+        console.log('🖼️ File selezionato:', {
+          name: avatarFile.name,
+          size: avatarFile.size,
+          type: avatarFile.type
+        });
+        console.log('📤 Uploading to Storage...');
 
         // Step 1: Upload to Supabase Storage 'avatars' bucket
         const timestamp = Date.now();
         const fileExtension = avatarFile.name.split('.').pop();
         const fileName = `avatar_${account.toLowerCase()}_${timestamp}.${fileExtension}`;
+
+        console.log('📁 Nome file generato:', fileName);
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('avatars')
@@ -412,10 +419,15 @@ export const Web3Provider = ({ children }) => {
           .getPublicUrl(fileName);
 
         avatarUrl = urlData.publicUrl;
-        console.log('✅ Avatar uploaded to Supabase:', avatarUrl);
+        console.log('✅ Upload completato, URL:', avatarUrl);
 
         // Step 2: Register avatar on blockchain as FREE content (price=0, isPaid=false)
-        console.log('⛓️ Registering avatar on blockchain as free content...');
+        console.log('⛓️ Chiamata contract.createContent...');
+        console.log('📋 Parametri blockchain:', {
+          url: avatarUrl,
+          price: 0,
+          isPaid: false
+        });
 
         try {
           const web3Provider = new ethers.BrowserProvider(window.ethereum);
@@ -426,27 +438,65 @@ export const Web3Provider = ({ children }) => {
             web3Signer
           );
 
+          console.log('🔐 Opening MetaMask for transaction...');
           // Create content with price=0 and isPaid=false (FREE content)
           const tx = await contractInstance.createContent(avatarUrl, 0, false);
+          console.log('✅ Transaction sent! Hash:', tx.hash);
           console.log('⏳ Waiting for blockchain confirmation...');
 
           const receipt = await tx.wait();
-          console.log('✅ Blockchain transaction confirmed:', receipt.hash);
+          console.log('✅ Transazione confermata! Receipt:', {
+            hash: receipt.hash,
+            blockNumber: receipt.blockNumber,
+            gasUsed: receipt.gasUsed?.toString()
+          });
 
           // Extract contentId from ContentCreated event
-          const contentCreatedEvent = receipt.logs.find(
-            log => log.fragment && log.fragment.name === 'ContentCreated'
-          );
+          console.log('🔍 Searching for ContentCreated event in logs...');
+          console.log('📊 Total logs:', receipt.logs.length);
 
-          if (contentCreatedEvent) {
-            avatarBlockchainId = contentCreatedEvent.args[0].toString();
-            console.log('✅ Avatar registered on blockchain with ID:', avatarBlockchainId);
-          } else {
+          // Parse logs using contract interface (more robust for ethers.js v6)
+          avatarBlockchainId = null;
+          for (const log of receipt.logs) {
+            try {
+              const parsedLog = contractInstance.interface.parseLog({
+                topics: [...log.topics],
+                data: log.data
+              });
+
+              if (parsedLog && parsedLog.name === 'ContentCreated') {
+                avatarBlockchainId = parsedLog.args[0].toString(); // contentId is first argument
+                console.log('✅ ContentCreated event found!');
+                console.log('✅ Transazione confermata, blockchain_id:', avatarBlockchainId);
+                console.log('📋 Event args:', {
+                  contentId: parsedLog.args[0].toString(),
+                  creator: parsedLog.args[1],
+                  price: parsedLog.args[2].toString()
+                });
+                break;
+              }
+            } catch (error) {
+              // Skip logs that don't match our contract ABI
+              continue;
+            }
+          }
+
+          if (!avatarBlockchainId) {
             console.warn('⚠️ ContentCreated event not found in transaction logs');
+            console.log('🔍 Available logs:', receipt.logs.map((log, idx) => ({
+              index: idx,
+              address: log.address,
+              topics: log.topics.map(t => t.substring(0, 10) + '...')
+            })));
           }
 
         } catch (blockchainError) {
           console.error('❌ Blockchain registration failed:', blockchainError);
+          console.error('📋 Error details:', {
+            code: blockchainError.code,
+            message: blockchainError.message,
+            reason: blockchainError.reason
+          });
           // Don't fail the entire profile update if blockchain registration fails
           // The avatar is still uploaded to Supabase
           console.log('⚠️ Continuing with profile update without blockchain registration');
@@ -454,7 +504,7 @@ export const Web3Provider = ({ children }) => {
       }
 
       // Step 3: Update Supabase with avatar URL and blockchain ID
-      console.log('📝 Updating profile in Supabase...');
+      console.log('💾 Aggiornamento database...');
       const supabaseUpdate = {
         wallet_address: account.toLowerCase(),
         username: username.trim(),
@@ -463,17 +513,25 @@ export const Web3Provider = ({ children }) => {
         avatar_blockchain_id: avatarBlockchainId
       };
 
+      console.log('📋 Dati da salvare:', supabaseUpdate);
+
       const result = await SupabaseService.createOrUpdateUser(supabaseUpdate);
 
       if (!result.success) {
-        console.error('⚠️ Failed to update profile in Supabase:', result.error);
+        console.error('❌ Failed to update profile in Supabase:', result.error);
         return { success: false, message: 'Failed to update profile: ' + result.error };
       }
 
-      console.log('✅ Profile updated in Supabase');
+      console.log('✅ Profile updated in Supabase successfully!');
 
       // Reload user data
+      console.log('🔄 Reloading user data...');
       await loadUserData(account);
+      console.log('✅ Foto profilo aggiornata! New user data:', {
+        username: username.trim(),
+        avatarUrl: avatarUrl,
+        blockchainId: avatarBlockchainId
+      });
 
       return { success: true, message: 'Profile updated successfully!' };
 
