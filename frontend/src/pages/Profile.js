@@ -69,12 +69,13 @@ const Profile = () => {
           userData = {
             username: userFromDB.data.username || 'Anonymous User',
             bio: userFromDB.data.bio || '',
-            avatarHash: userFromDB.data.avatar_hash || '',
+            avatarHash: userFromDB.data.avatar_url || userFromDB.data.avatar_hash || '',
             isCreator: userFromDB.data.is_creator || false,
             followersCount: userFromDB.data.followers_count || 0,
             followingCount: userFromDB.data.following_count || 0,
             totalEarnings: '0' // TODO: load from blockchain or Supabase
           };
+          console.log('🖼️ [Profile] Avatar URL loaded:', userData.avatarHash);
         } else {
           console.warn('⚠️ [Profile] User not found in Supabase');
 
@@ -84,7 +85,7 @@ const Profile = () => {
             userData = {
               username: user.username || 'Anonymous User',
               bio: user.bio || '',
-              avatarHash: user.profileImage || '',
+              avatarHash: user.avatarHash || '',
               isCreator: user.isCreator || false,
               followersCount: 0,
               followingCount: 0,
@@ -101,7 +102,7 @@ const Profile = () => {
           userData = {
             username: user.username || 'Anonymous User',
             bio: user.bio || '',
-            avatarHash: user.profileImage || '',
+            avatarHash: user.avatarHash || '',
             isCreator: user.isCreator || false,
             followersCount: 0,
             followingCount: 0,
@@ -297,16 +298,24 @@ const Profile = () => {
           <div className="relative">
             <div className="w-24 h-24 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center overflow-hidden">
               {profileData.avatarHash && getMediaUrl(profileData.avatarHash) ? (
-                <img 
+                <img
                   src={getMediaUrl(profileData.avatarHash)}
                   alt={`${profileData.username}'s avatar`}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error('❌ Failed to load avatar image:', getMediaUrl(profileData.avatarHash));
+                    // Fallback to initial letter on error
+                    e.target.style.display = 'none';
+                    e.target.nextElementSibling.style.display = 'flex';
+                  }}
                 />
-              ) : (
-                <span className="text-pink-800 text-2xl font-bold">
-                  {profileData.username.charAt(0).toUpperCase()}
-                </span>
-              )}
+              ) : null}
+              <span
+                className="text-pink-800 text-2xl font-bold w-full h-full flex items-center justify-center"
+                style={{ display: profileData.avatarHash && getMediaUrl(profileData.avatarHash) ? 'none' : 'flex' }}
+              >
+                {profileData.username.charAt(0).toUpperCase()}
+              </span>
             </div>
             {profileData.isCreator && (
               <div className="absolute -bottom-2 -right-2 bg-purple-500 text-white rounded-full p-1">

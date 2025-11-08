@@ -4,8 +4,10 @@ import { Link, useLocation } from 'react-router-dom';
 import { Search, Home, MessageCircle, User, PlusSquare, DollarSign, LogOut } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
 import { SupabaseService } from '../services/supabaseService';
+import { useWeb3 } from '../contexts/Web3Context';
 
 const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loading }) => {
+  const { getMediaUrl } = useWeb3();
   const location = useLocation();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
@@ -158,8 +160,23 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center">
-                    <span className="text-pink-800 font-semibold text-sm">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center overflow-hidden">
+                    {user.avatarHash && getMediaUrl(user.avatarHash) ? (
+                      <img
+                        src={getMediaUrl(user.avatarHash)}
+                        alt={`${user.username}'s avatar`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to initial letter on error
+                          e.target.style.display = 'none';
+                          e.target.nextElementSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <span
+                      className="text-pink-800 font-semibold text-sm w-full h-full flex items-center justify-center"
+                      style={{ display: user.avatarHash && getMediaUrl(user.avatarHash) ? 'none' : 'flex' }}
+                    >
                       {user.username.charAt(0).toUpperCase()}
                     </span>
                   </div>

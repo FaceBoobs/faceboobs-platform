@@ -580,10 +580,16 @@ export const Web3Provider = ({ children }) => {
     });
   };
 
-  // Retrieve media from localStorage
+  // Retrieve media from localStorage OR return direct URL
   const getMediaUrl = (fileId) => {
     if (!fileId || typeof fileId !== 'string') {
       return null;
+    }
+
+    // If fileId is already a direct URL (e.g., Supabase Storage URL), return it directly
+    if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
+      console.log('🌐 [getMediaUrl] Direct URL detected:', fileId.substring(0, 50) + '...');
+      return fileId;
     }
 
     // For demo/placeholder content, return null to show placeholder
@@ -591,11 +597,13 @@ export const Web3Provider = ({ children }) => {
       return null;
     }
 
+    // Try to retrieve from localStorage (for old base64 stored images)
     try {
       const storedData = localStorage.getItem(fileId);
       if (storedData) {
         const mediaData = JSON.parse(storedData);
         if (mediaData && mediaData.base64) {
+          console.log('💾 [getMediaUrl] Found in localStorage:', fileId);
           return mediaData.base64;
         }
       }
@@ -603,6 +611,7 @@ export const Web3Provider = ({ children }) => {
       console.error('Error retrieving media:', error);
     }
 
+    console.log('❌ [getMediaUrl] No media found for:', fileId);
     return null;
   };
 

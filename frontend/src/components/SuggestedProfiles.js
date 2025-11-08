@@ -62,7 +62,7 @@ const SuggestedProfiles = () => {
             id: user.id,
             username: user.username || `User${walletAddr?.substring(0, 6)}`,
             walletAddress: walletAddr, // Use wallet_address or address
-            avatarHash: user.avatar_hash,
+            avatarHash: user.avatar_url || user.avatar_hash || '',
             bio: user.bio || '',
             isCreator: user.is_creator || false,
             createdAt: user.created_at
@@ -289,12 +289,19 @@ const SuggestedProfiles = () => {
                     src={getMediaUrl(user.avatarHash)}
                     alt={`${user.username}'s avatar`}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback to initial letter on error
+                      e.target.style.display = 'none';
+                      e.target.parentElement.querySelector('span')?.style.setProperty('display', 'flex', 'important');
+                    }}
                   />
-                ) : (
-                  <span className="text-white text-sm font-semibold">
-                    {user.username.charAt(0).toUpperCase()}
-                  </span>
-                )}
+                ) : null}
+                <span
+                  className="text-white text-sm font-semibold w-full h-full flex items-center justify-center"
+                  style={{ display: user.avatarHash && getMediaUrl(user.avatarHash) ? 'none' : 'flex' }}
+                >
+                  {user.username.charAt(0).toUpperCase()}
+                </span>
               </div>
 
               {/* User Info - Clickable */}
