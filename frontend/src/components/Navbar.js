@@ -129,7 +129,7 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
                     to={item.path}
                     className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors relative ${
                       isActive
-                        ? 'bg-blue-50 text-blue-600'
+                        ? 'bg-pink-50 text-pink-600'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                     }`}
                   >
@@ -261,7 +261,7 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
                     to={item.path}
                     className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors relative ${
                       isActive
-                        ? 'text-blue-600'
+                        ? 'text-pink-600'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
