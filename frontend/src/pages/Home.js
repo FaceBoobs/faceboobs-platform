@@ -296,6 +296,32 @@ const Home = () => {
         console.log('✅ Purchase saved to Supabase:', saveResult.data);
       }
 
+      // Create notification for the content creator
+      try {
+        // Find the post to get creator info
+        const post = contents.find(p => p.id === parseInt(contentId));
+        if (post && post.creator_address) {
+          // Don't create notification if user purchases their own content
+          if (post.creator_address.toLowerCase() !== account.toLowerCase()) {
+            const notificationData = {
+              user_address: post.creator_address.toLowerCase(),
+              type: 'purchase',
+              title: 'New Purchase',
+              message: `${user?.username || `User${account.substring(0, 6)}`} purchased your content for ${price} BNB`,
+              post_id: parseInt(contentId),
+              from_user_address: account.toLowerCase(),
+              from_username: user?.username || `User${account.substring(0, 6)}`
+            };
+
+            await SupabaseService.createNotification(notificationData);
+            console.log('✅ Purchase notification created');
+          }
+        }
+      } catch (notifError) {
+        console.error('Failed to create purchase notification:', notifError);
+        // Don't fail the purchase if notification fails
+      }
+
       // Step 4: Show success message
       toast.success('🎉 Content purchased successfully!');
 

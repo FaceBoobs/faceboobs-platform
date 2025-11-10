@@ -168,11 +168,10 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
             user_address: content.creator.toLowerCase(),
             type: 'purchase',
             title: 'New Purchase',
-            content: `${user?.username || `User${account.substring(0, 6)}`} purchased your content for ${content.price} BNB`,
+            message: `${user?.username || `User${account.substring(0, 6)}`} purchased your content for ${content.price} BNB`,
             post_id: parseInt(content.id),
-            from_address: account.toLowerCase(),
-            from_username: user?.username || `User${account.substring(0, 6)}`,
-            amount: content.price.toString()
+            from_user_address: account.toLowerCase(),
+            from_username: user?.username || `User${account.substring(0, 6)}`
           };
 
           await SupabaseService.createNotification(notificationData);
