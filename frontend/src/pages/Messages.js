@@ -13,7 +13,7 @@ import CONTRACT_ABI from '../contracts/SocialPlatform.json';
 const CONTRACT_ADDRESS = "0x575e0532445489dd31C12615BeC7C63d737B69DD";
 
 const Messages = () => {
-  const { user, account, loading } = useWeb3();
+  const { user, account, loading, getMediaUrl } = useWeb3();
   const { toast } = useToast();
   const [conversations, setConversations] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
@@ -270,7 +270,8 @@ const Messages = () => {
               timestamp: conv.lastTimestamp,
               unread: unreadCount > 0,
               unreadCount: unreadCount,
-              avatar: otherUser?.username?.charAt(0).toUpperCase() || '👤'
+              avatar: otherUser?.username?.charAt(0).toUpperCase() || '👤',
+              avatarUrl: otherUser?.avatar_url || null
             };
           })
         );
@@ -860,11 +861,12 @@ const Messages = () => {
           return hasValidAddress;
         });
 
-        // Transform users to ensure they have 'address' field for Messages component
+        // Transform users to ensure they have 'address' and 'avatarUrl' fields
         const transformedUsers = users.map(u => ({
           ...u,
           address: u.wallet_address || u.address,
-          username: u.username || `User${(u.wallet_address || u.address)?.substring(0, 6)}`
+          username: u.username || `User${(u.wallet_address || u.address)?.substring(0, 6)}`,
+          avatarUrl: u.avatar_url || null
         }));
 
         console.log('✅ Loaded users:', transformedUsers.length, transformedUsers);
@@ -902,7 +904,8 @@ const Messages = () => {
       lastMessage: 'Start a conversation',
       timestamp: Date.now(),
       unread: false,
-      avatar: selectedUser.username?.charAt(0).toUpperCase() || '👤'
+      avatar: selectedUser.username?.charAt(0).toUpperCase() || '👤',
+      avatarUrl: selectedUser.avatarUrl || null
     };
 
     // Set as active chat
@@ -1009,7 +1012,25 @@ const Messages = () => {
                   }
                 >
                   <div className="flex items-center space-x-3">
-                    <div className="text-2xl">{conversation.avatar}</div>
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-400 to-white flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {conversation.avatarUrl && getMediaUrl(conversation.avatarUrl) ? (
+                        <img
+                          src={getMediaUrl(conversation.avatarUrl)}
+                          alt={`${conversation.username}'s avatar`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextElementSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <span
+                        className="text-pink-800 text-xl font-bold w-full h-full flex items-center justify-center"
+                        style={{ display: conversation.avatarUrl && getMediaUrl(conversation.avatarUrl) ? 'none' : 'flex' }}
+                      >
+                        {conversation.avatar}
+                      </span>
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <h3 className={`text-gray-900 truncate ${hasUnread ? 'font-bold' : 'font-medium'}`}>
@@ -1041,7 +1062,25 @@ const Messages = () => {
           <>
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="text-2xl">{activeChat.avatar}</div>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-pink-400 to-white flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {activeChat.avatarUrl && getMediaUrl(activeChat.avatarUrl) ? (
+                    <img
+                      src={getMediaUrl(activeChat.avatarUrl)}
+                      alt={`${activeChat.username}'s avatar`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextElementSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <span
+                    className="text-pink-800 text-lg font-bold w-full h-full flex items-center justify-center"
+                    style={{ display: activeChat.avatarUrl && getMediaUrl(activeChat.avatarUrl) ? 'none' : 'flex' }}
+                  >
+                    {activeChat.avatar}
+                  </span>
+                </div>
                 <div>
                   <h2 className="font-semibold text-gray-900">{activeChat.username}</h2>
                   <p className="text-sm text-gray-500">Active now</p>
@@ -1281,8 +1320,24 @@ const Messages = () => {
                       onClick={() => handleStartChat(user)}
                       className="w-full p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors text-left flex items-center space-x-3"
                     >
-                      <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center text-xl font-semibold">
-                        {user.username?.charAt(0).toUpperCase() || '👤'}
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {user.avatarUrl && getMediaUrl(user.avatarUrl) ? (
+                          <img
+                            src={getMediaUrl(user.avatarUrl)}
+                            alt={`${user.username}'s avatar`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextElementSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <span
+                          className="text-white text-xl font-semibold w-full h-full flex items-center justify-center"
+                          style={{ display: user.avatarUrl && getMediaUrl(user.avatarUrl) ? 'none' : 'flex' }}
+                        >
+                          {user.username?.charAt(0).toUpperCase() || '👤'}
+                        </span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-gray-900 truncate">
