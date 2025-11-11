@@ -10,7 +10,7 @@ import PostDetailModal from '../components/PostDetailModal';
 import { SupabaseService } from '../services/supabaseService';
 
 const Profile = () => {
-  const { contract, user, getMediaUrl, updateProfile, loading: web3Loading } = useWeb3();
+  const { contract, account, user, getMediaUrl, updateProfile, loading: web3Loading } = useWeb3();
   const { toast } = useToast();
   const { address } = useParams();
   const isOwnProfile = !address || address === user?.address;
@@ -23,6 +23,7 @@ const Profile = () => {
   const [showPostDetail, setShowPostDetail] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [purchasedPosts, setPurchasedPosts] = useState({}); // { postId: true/false }
 
   useEffect(() => {
     if (profileAddress && user) {
@@ -148,12 +149,34 @@ const Profile = () => {
           description: post.description || '',
           isPaid: post.is_paid || false,
           price: post.price ? post.price.toString() : '0',
+          blockchainContentId: post.blockchain_content_id || null,
           timestamp: Math.floor(new Date(post.created_at).getTime() / 1000),
           purchaseCount: post.purchase_count || 0
         }));
 
         console.log(`✅ Loaded ${userPosts.length} user posts from Supabase`);
         setUserContents(userPosts);
+
+        // Check purchase status for paid posts (if not own profile)
+        if (!isOwnProfile && account) {
+          console.log('🔐 Checking purchase status for paid posts...');
+          await checkPurchaseStatus(userPosts);
+        } else if (isOwnProfile) {
+          // Own posts are always accessible
+          const ownPurchases = {};
+          userPosts.forEach(post => {
+            ownPurchases[post.id] = true;
+          });
+          setPurchasedPosts(ownPurchases);
+        } else if (!account) {
+          // Not authenticated - lock all paid posts
+          const guestPurchases = {};
+          userPosts.forEach(post => {
+            guestPurchases[post.id] = !post.isPaid; // Only free posts are accessible
+          });
+          setPurchasedPosts(guestPurchases);
+          console.log('👤 Guest user - paid posts locked');
+        }
       } else {
         console.error('Error loading user posts:', postsResult.error);
         setUserContents([]);
@@ -178,6 +201,37 @@ const Profile = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const checkContentAccess = async (contentId) => {
+    if (!account) return false;
+
+    try {
+      const result = await SupabaseService.checkContentAccess(account, contentId);
+      return result.success ? result.hasAccess : false;
+    } catch (error) {
+      console.error('Error checking content access:', error);
+      return false;
+    }
+  };
+
+  const checkPurchaseStatus = async (posts) => {
+    const purchases = {};
+
+    // Check purchase status for each post
+    for (const post of posts) {
+      if (post.isPaid) {
+        const hasAccess = await checkContentAccess(post.id);
+        purchases[post.id] = hasAccess;
+        console.log(`   Post ${post.id}: ${hasAccess ? '✅ Purchased' : '🔒 Locked'}`);
+      } else {
+        // Free posts are always accessible
+        purchases[post.id] = true;
+      }
+    }
+
+    setPurchasedPosts(purchases);
+    console.log('✅ Purchase status loaded:', purchases);
   };
 
   const handleFollow = async () => {
@@ -412,34 +466,59 @@ const Profile = () => {
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-1 md:gap-4">
-              {userContents.map((content) => (
-                <div key={content.id} className="relative group">
-                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                    <img
-                      src={content.content}
-                      alt="Post content"
-                      className="w-full h-full object-cover cursor-pointer"
-                      onClick={() => {
-                        setSelectedPost(content);
-                        setShowPostDetail(true);
-                      }}
-                    />
+              {userContents.map((content) => {
+                const isPaid = content.isPaid;
+                const hasPurchased = purchasedPosts[content.id] || false;
+                const isLocked = isPaid && !hasPurchased;
+
+                return (
+                  <div key={content.id} className="relative group">
+                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                      <img
+                        src={content.content}
+                        alt="Post content"
+                        className={`w-full h-full object-cover cursor-pointer transition-all ${
+                          isLocked ? 'blur-md' : ''
+                        }`}
+                        onClick={() => {
+                          setSelectedPost(content);
+                          setShowPostDetail(true);
+                        }}
+                      />
+
+                      {/* Lock overlay for paid content not purchased */}
+                      {isLocked && (
+                        <div
+                          className="absolute inset-0 bg-black bg-opacity-40 flex flex-col items-center justify-center cursor-pointer"
+                          onClick={() => {
+                            setSelectedPost(content);
+                            setShowPostDetail(true);
+                          }}
+                        >
+                          <Lock className="text-white mb-2" size={32} />
+                          <span className="text-white text-sm font-semibold">
+                            {content.price} BNB
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Delete button for own profile */}
+                    {isOwnProfile && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePost(content.id);
+                        }}
+                        className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                        title="Delete post"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
-                  {/* Delete button for own profile */}
-                  {isOwnProfile && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeletePost(content.id);
-                      }}
-                      className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                      title="Delete post"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
