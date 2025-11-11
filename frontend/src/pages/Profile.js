@@ -23,12 +23,23 @@ const Profile = () => {
   const [showPostDetail, setShowPostDetail] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [userPurchases, setUserPurchases] = useState([]); // Array of purchased blockchain_content_id
 
   useEffect(() => {
     if (profileAddress && user) {
       loadProfileData();
     }
   }, [profileAddress, user, contract]);
+
+  // Load user purchases once when account is available
+  useEffect(() => {
+    if (account && !isOwnProfile) {
+      loadUserPurchases();
+    } else if (isOwnProfile) {
+      // Own profile - all posts are accessible, no need to load purchases
+      setUserPurchases([]);
+    }
+  }, [account, isOwnProfile]);
 
   // Add a refresh mechanism that can be called from outside
   useEffect(() => {
@@ -43,6 +54,36 @@ const Profile = () => {
     window.addEventListener('refreshFeed', handleRefreshFeed);
     return () => window.removeEventListener('refreshFeed', handleRefreshFeed);
   }, [profileAddress, user]);
+
+  const loadUserPurchases = async () => {
+    if (!account) {
+      setUserPurchases([]);
+      return;
+    }
+
+    try {
+      console.log('🔐 Loading user purchases for:', account);
+
+      // Get all posts purchased by the current user
+      const result = await SupabaseService.getUserPurchases(account);
+
+      if (result.success && result.data) {
+        // Extract blockchain_content_id from purchases
+        const purchasedIds = result.data
+          .map(purchase => purchase.blockchain_content_id)
+          .filter(id => id); // Remove null/undefined
+
+        setUserPurchases(purchasedIds);
+        console.log(`✅ Loaded ${purchasedIds.length} purchases:`, purchasedIds);
+      } else {
+        console.log('No purchases found or error:', result.error);
+        setUserPurchases([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading user purchases:', error);
+      setUserPurchases([]); // Fallback to empty array (all paid posts locked)
+    }
+  };
 
   const loadProfileData = async () => {
     try {
@@ -419,34 +460,79 @@ const Profile = () => {
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-1 md:gap-4">
-              {userContents.map((content) => (
-                <div key={content.id} className="relative group">
-                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                    <img
-                      src={content.content}
-                      alt="Post content"
-                      className="w-full h-full object-cover cursor-pointer"
+              {userContents.map((content) => {
+                // Check if post is paid and NOT purchased
+                const isPaid = content.isPaid || false;
+                const blockchainId = content.blockchainContentId;
+                const hasPurchased = isOwnProfile || !isPaid || (blockchainId && userPurchases.includes(blockchainId));
+                const isLocked = isPaid && !hasPurchased;
+
+                return (
+                  <div key={content.id} className="relative group">
+                    <div
+                      className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer"
                       onClick={() => {
                         setSelectedPost(content);
                         setShowPostDetail(true);
                       }}
-                    />
-                  </div>
-                  {/* Delete button for own profile */}
-                  {isOwnProfile && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeletePost(content.id);
-                      }}
-                      className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                      title="Delete post"
                     >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              ))}
+                      {/* Show image only if NOT locked */}
+                      {!isLocked ? (
+                        <img
+                          src={content.content}
+                          alt="Post content"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback to placeholder on error
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        /* Placeholder for locked content - NO API call */
+                        <div className="w-full h-full bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400" />
+                      )}
+
+                      {/* Lock overlay for paid content not purchased */}
+                      {isLocked && (
+                        <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center">
+                          <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-full p-3 mb-2">
+                            <svg
+                              className="w-8 h-8 text-white"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                              />
+                            </svg>
+                          </div>
+                          <span className="text-white text-sm font-bold bg-black bg-opacity-40 px-3 py-1 rounded-full">
+                            Premium - {content.price} BNB
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Delete button for own profile */}
+                    {isOwnProfile && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePost(content.id);
+                        }}
+                        className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-10"
+                        title="Delete post"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
