@@ -1,6 +1,6 @@
 // src/pages/Profile.js
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
 import { Edit, UserPlus, UserMinus, Grid, Trash2 } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
@@ -13,6 +13,8 @@ const Profile = () => {
   const { contract, account, user, getMediaUrl, updateProfile, loading: web3Loading } = useWeb3();
   const { toast } = useToast();
   const { address } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const isOwnProfile = !address || address === user?.address;
   const profileAddress = address || user?.address;
 
@@ -24,6 +26,9 @@ const Profile = () => {
   const [selectedPost, setSelectedPost] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [userPurchases, setUserPurchases] = useState([]); // Array of purchased blockchain_content_id
+
+  // Ref to track processed notification postId to prevent infinite loop
+  const processedPostIdRef = useRef(null);
 
   useEffect(() => {
     if (profileAddress && user) {
@@ -54,6 +59,61 @@ const Profile = () => {
     window.addEventListener('refreshFeed', handleRefreshFeed);
     return () => window.removeEventListener('refreshFeed', handleRefreshFeed);
   }, [profileAddress, user]);
+
+  // Scroll to post from notification when location state has scrollToPostId
+  useEffect(() => {
+    const scrollToPostId = location.state?.scrollToPostId;
+
+    // Only process if:
+    // 1. We have a scrollToPostId
+    // 2. We haven't attempted scroll for this postId yet
+    // 3. Posts are loaded
+    if (scrollToPostId && processedPostIdRef.current !== scrollToPostId && !loading && userContents.length > 0) {
+      console.log('📬 Processing notification click for post in profile:', scrollToPostId);
+
+      // Mark as processed IMMEDIATELY to prevent re-entry
+      processedPostIdRef.current = scrollToPostId;
+
+      // Clear the state IMMEDIATELY to prevent loop
+      navigate(location.pathname, { replace: true, state: {} });
+
+      // Try to find the post in profile
+      const post = userContents.find(c => c.id === scrollToPostId);
+
+      if (post) {
+        console.log('✅ Post found in profile, scrolling to it:', post.id);
+
+        // Wait for DOM to update, then scroll
+        setTimeout(() => {
+          const postElement = document.getElementById(`post-${scrollToPostId}`);
+
+          if (postElement) {
+            console.log('🎯 Found post element, scrolling...');
+            postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Optional: Add flash/highlight animation
+            postElement.classList.add('ring-4', 'ring-purple-400', 'ring-opacity-50');
+            setTimeout(() => {
+              postElement.classList.remove('ring-4', 'ring-purple-400', 'ring-opacity-50');
+            }, 2000);
+          } else {
+            console.warn('⚠️ Post element not found in DOM:', `post-${scrollToPostId}`);
+            toast.error('Post not visible in profile');
+          }
+        }, 300);
+      } else {
+        console.log('❌ Post not in profile:', scrollToPostId);
+        toast.error('Post not found in profile');
+      }
+    }
+  }, [location.state, userContents, loading, navigate, toast, location.pathname]);
+
+  // Reset processed postId when navigating away from profile
+  useEffect(() => {
+    return () => {
+      processedPostIdRef.current = null;
+    };
+  }, [location.pathname]);
 
   const loadUserPurchases = async () => {
     if (!account) {
@@ -480,7 +540,7 @@ const Profile = () => {
                 }
 
                 return (
-                  <div key={content.id} className="relative group">
+                  <div key={content.id} id={`post-${content.id}`} className="relative group transition-all">
                     <div
                       className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer relative"
                       onClick={() => {
