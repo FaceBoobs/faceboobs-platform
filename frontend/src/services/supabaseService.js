@@ -35,6 +35,30 @@ export class SupabaseService {
     }
   }
 
+  // Get a single post by ID
+  static async getPostById(postId) {
+    try {
+      console.log('🔍 Fetching single post:', postId);
+
+      const { data, error } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('id', postId)
+        .single();
+
+      if (error) throw error;
+
+      if (!data) {
+        return { success: false, error: 'Post not found' };
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error fetching post by ID:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   static async getPostsByCreator(creatorAddress, limit = 50) {
     try {
       const { data, error } = await supabase

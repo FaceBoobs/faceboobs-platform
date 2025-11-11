@@ -72,8 +72,8 @@ const Home = () => {
     // Only process if:
     // 1. We have an openPostId
     // 2. We haven't processed this exact postId yet
-    // 3. We have loaded contents
-    if (openPostId && processedPostIdRef.current !== openPostId && contents.length > 0) {
+    // 3. We have loaded contents (or no contents yet on first load)
+    if (openPostId && processedPostIdRef.current !== openPostId && !loading) {
       console.log('📬 Processing notification click for post:', openPostId);
 
       // Mark as processed IMMEDIATELY to prevent re-entry
@@ -82,20 +82,60 @@ const Home = () => {
       // Clear the state IMMEDIATELY to prevent loop
       navigate(location.pathname, { replace: true, state: {} });
 
-      // Try to find the post
+      // Try to find the post in current feed
       const post = contents.find(c => c.id === openPostId);
 
       if (post) {
-        console.log('✅ Post found, opening modal:', post.id);
+        console.log('✅ Post found in feed, opening modal:', post.id);
         setSelectedPost(post);
         setShowPostDetail(true);
       } else {
-        console.log('⚠️ Post not found in feed:', openPostId);
-        // Show toast only ONCE (we already marked as processed)
-        toast.error('Post not found in your feed');
+        // Post not in feed - fetch it directly
+        console.log('🔍 Post not in feed, fetching from database:', openPostId);
+        fetchAndOpenPost(openPostId);
       }
     }
-  }, [location.state, contents, navigate, toast]);
+  }, [location.state, contents, loading, navigate, toast]);
+
+  // Fetch a single post and open it in modal
+  const fetchAndOpenPost = async (postId) => {
+    try {
+      const result = await SupabaseService.getPostById(postId);
+
+      if (result.success && result.data) {
+        console.log('✅ Post fetched successfully:', result.data);
+
+        // Convert Supabase post to expected format
+        const postData = {
+          id: result.data.id,
+          creator: result.data.creator_address,
+          creatorData: {
+            username: result.data.username || `User${result.data.creator_address?.substring(0, 6)}`,
+            profileImage: '',
+            address: result.data.creator_address,
+            isCreator: true
+          },
+          content: result.data.image_url,
+          contentHash: result.data.content_hash,
+          description: result.data.description || '',
+          isPaid: result.data.is_paid || false,
+          price: result.data.price ? result.data.price.toString() : '0',
+          blockchainContentId: result.data.blockchain_content_id || null,
+          timestamp: Math.floor(new Date(result.data.created_at).getTime() / 1000),
+          purchaseCount: result.data.purchase_count || 0
+        };
+
+        setSelectedPost(postData);
+        setShowPostDetail(true);
+      } else {
+        console.log('⚠️ Post not available:', result.error);
+        toast.error('Post not available');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching post:', error);
+      toast.error('Failed to load post');
+    }
+  };
 
   // Reset processed postId when navigating away from home
   useEffect(() => {
