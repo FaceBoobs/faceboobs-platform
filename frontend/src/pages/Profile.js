@@ -23,7 +23,6 @@ const Profile = () => {
   const [showPostDetail, setShowPostDetail] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [purchasedPosts, setPurchasedPosts] = useState({}); // { postId: true/false }
 
   useEffect(() => {
     if (profileAddress && user) {
@@ -158,27 +157,6 @@ const Profile = () => {
 
           console.log(`✅ Loaded ${userPosts.length} user posts from Supabase`);
           setUserContents(userPosts);
-
-        // Check purchase status for paid posts (if not own profile)
-        if (!isOwnProfile && account) {
-          console.log('🔐 Checking purchase status for paid posts...');
-          await checkPurchaseStatus(userPosts);
-        } else if (isOwnProfile) {
-          // Own posts are always accessible
-          const ownPurchases = {};
-          userPosts.forEach(post => {
-            ownPurchases[post.id] = true;
-          });
-          setPurchasedPosts(ownPurchases);
-        } else if (!account) {
-          // Not authenticated - lock all paid posts
-          const guestPurchases = {};
-          userPosts.forEach(post => {
-            guestPurchases[post.id] = !post.isPaid; // Only free posts are accessible
-          });
-          setPurchasedPosts(guestPurchases);
-          console.log('👤 Guest user - paid posts locked');
-        }
         } else {
           console.error('Error loading user posts:', postsResult.error);
           setUserContents([]);
@@ -206,60 +184,6 @@ const Profile = () => {
       console.error('Error loading profile:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const checkContentAccess = async (contentId) => {
-    if (!account) return false;
-
-    try {
-      const result = await SupabaseService.checkContentAccess(account, contentId);
-      return result.success ? result.hasAccess : false;
-    } catch (error) {
-      console.error('Error checking content access:', error);
-      return false;
-    }
-  };
-
-  const checkPurchaseStatus = async (posts) => {
-    const purchases = {};
-
-    try {
-      // Check purchase status for each post
-      for (const post of posts) {
-        if (!post || !post.id) {
-          console.warn('⚠️ Invalid post in checkPurchaseStatus:', post);
-          continue;
-        }
-
-        if (post.isPaid) {
-          try {
-            const hasAccess = await checkContentAccess(post.id);
-            purchases[post.id] = hasAccess;
-            console.log(`   Post ${post.id}: ${hasAccess ? '✅ Purchased' : '🔒 Locked'}`);
-          } catch (error) {
-            console.error(`❌ Error checking access for post ${post.id}:`, error);
-            // On error, assume locked for security
-            purchases[post.id] = false;
-          }
-        } else {
-          // Free posts are always accessible
-          purchases[post.id] = true;
-        }
-      }
-
-      setPurchasedPosts(purchases);
-      console.log('✅ Purchase status loaded:', purchases);
-    } catch (error) {
-      console.error('❌ Error in checkPurchaseStatus:', error);
-      // On error, set all as inaccessible for security
-      const safePurchases = {};
-      posts.forEach(post => {
-        if (post && post.id) {
-          safePurchases[post.id] = !post.isPaid; // Only free posts accessible
-        }
-      });
-      setPurchasedPosts(safePurchases);
     }
   };
 
@@ -495,63 +419,34 @@ const Profile = () => {
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-1 md:gap-4">
-              {userContents.map((content) => {
-                const isPaid = content.isPaid;
-                const hasPurchased = purchasedPosts[content.id] || false;
-                const isLocked = isPaid && !hasPurchased;
-
-                return (
-                  <div key={content.id} className="relative group">
-                    <div
-                      className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer"
+              {userContents.map((content) => (
+                <div key={content.id} className="relative group">
+                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                    <img
+                      src={content.content}
+                      alt="Post content"
+                      className="w-full h-full object-cover cursor-pointer"
                       onClick={() => {
                         setSelectedPost(content);
                         setShowPostDetail(true);
                       }}
-                    >
-                      {/* Only load image if NOT locked to avoid 400 errors */}
-                      {!isLocked ? (
-                        <img
-                          src={content.content}
-                          alt="Post content"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            // Fallback if image fails to load
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        /* Placeholder for locked content - NO image load */
-                        <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
-                      )}
-
-                      {/* Lock overlay for paid content not purchased */}
-                      {isLocked && (
-                        <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center">
-                          <Lock className="text-white mb-2" size={32} />
-                          <span className="text-white text-sm font-semibold">
-                            {content.price} BNB
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Delete button for own profile */}
-                    {isOwnProfile && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeletePost(content.id);
-                        }}
-                        className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                        title="Delete post"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                    />
                   </div>
-                );
-              })}
+                  {/* Delete button for own profile */}
+                  {isOwnProfile && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePost(content.id);
+                      }}
+                      className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                      title="Delete post"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>

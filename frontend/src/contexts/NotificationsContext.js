@@ -49,6 +49,9 @@ export const NotificationsProvider = ({ children }) => {
   }, [loadNotifications]);
 
   // Setup real-time subscription for new notifications
+  // TEMPORANEAMENTE DISABILITATO - Causa "Illegal constructor" error
+  // TODO: Reimplementare con gestione corretta di Supabase Realtime
+  /*
   useEffect(() => {
     if (!account) return;
 
@@ -92,6 +95,7 @@ export const NotificationsProvider = ({ children }) => {
       }
     };
   }, [account]);
+  */
 
   // Add a new notification (optimistic update - notification is already created in Supabase)
   const addNotification = useCallback((notification) => {
