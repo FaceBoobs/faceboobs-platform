@@ -467,52 +467,75 @@ const Profile = () => {
                 const hasPurchased = isOwnProfile || !isPaid || (blockchainId && userPurchases.includes(blockchainId));
                 const isLocked = isPaid && !hasPurchased;
 
+                // Debug log for first few posts
+                if (content.id <= 5 || isLocked) {
+                  console.log(`Post ${content.id}:`, {
+                    isPaid,
+                    blockchainId,
+                    isOwnProfile,
+                    userPurchasesCount: userPurchases.length,
+                    hasPurchased,
+                    isLocked
+                  });
+                }
+
                 return (
                   <div key={content.id} className="relative group">
                     <div
-                      className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer"
+                      className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer relative"
                       onClick={() => {
                         setSelectedPost(content);
                         setShowPostDetail(true);
                       }}
                     >
-                      {/* Show image only if NOT locked */}
-                      {!isLocked ? (
-                        <img
-                          src={content.content}
-                          alt="Post content"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            // Fallback to placeholder on error
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        /* Placeholder for locked content - NO API call */
-                        <div className="w-full h-full bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400" />
-                      )}
+                      {/* Always show image, apply blur if locked */}
+                      <img
+                        src={content.content}
+                        alt="Post content"
+                        className={`w-full h-full object-cover transition-all ${
+                          isLocked ? 'blur-md scale-110' : ''
+                        }`}
+                        onError={(e) => {
+                          // Fallback to placeholder on error
+                          e.target.style.display = 'none';
+                          const placeholder = document.createElement('div');
+                          placeholder.className = 'w-full h-full bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400';
+                          e.target.parentNode.appendChild(placeholder);
+                        }}
+                      />
 
                       {/* Lock overlay for paid content not purchased */}
                       {isLocked && (
-                        <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center">
-                          <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-full p-3 mb-2">
+                        <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center z-10">
+                          {/* Lock icon with background */}
+                          <div className="bg-white bg-opacity-20 backdrop-blur-md rounded-full p-4 mb-3 shadow-lg">
                             <svg
-                              className="w-8 h-8 text-white"
+                              className="w-10 h-10 text-white drop-shadow-lg"
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
                             >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                strokeWidth={2}
+                                strokeWidth={2.5}
                                 d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                               />
                             </svg>
                           </div>
-                          <span className="text-white text-sm font-bold bg-black bg-opacity-40 px-3 py-1 rounded-full">
-                            Premium - {content.price} BNB
-                          </span>
+                          {/* Premium badge */}
+                          <div className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-2 rounded-full shadow-xl">
+                            <span className="text-white text-sm font-extrabold tracking-wide">
+                              PREMIUM
+                            </span>
+                          </div>
+                          {/* Price */}
+                          <div className="mt-2 bg-black bg-opacity-60 px-3 py-1 rounded-full">
+                            <span className="text-white text-xs font-semibold">
+                              {content.price} BNB
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -524,7 +547,7 @@ const Profile = () => {
                           e.stopPropagation();
                           handleDeletePost(content.id);
                         }}
-                        className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-10"
+                        className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-20"
                         title="Delete post"
                       >
                         <Trash2 size={14} />
