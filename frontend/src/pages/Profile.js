@@ -524,8 +524,8 @@ const Profile = () => {
                               />
                             </svg>
                           </div>
-                          {/* Premium badge */}
-                          <div className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-2 rounded-full shadow-xl">
+                          {/* Premium badge - Purple/Pink gradient to match Buy button */}
+                          <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2 rounded-full shadow-xl">
                             <span className="text-white text-sm font-extrabold tracking-wide">
                               PREMIUM
                             </span>
