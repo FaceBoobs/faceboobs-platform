@@ -310,7 +310,8 @@ const Home = () => {
               message: `${user?.username || `User${account.substring(0, 6)}`} purchased your content for ${price} BNB`,
               post_id: parseInt(contentId),
               from_user_address: account.toLowerCase(),
-              from_username: user?.username || `User${account.substring(0, 6)}`
+              from_username: user?.username || `User${account.substring(0, 6)}`,
+              from_avatar_url: user?.profileImage || user?.avatarHash || null
             };
 
             await SupabaseService.createNotification(notificationData);

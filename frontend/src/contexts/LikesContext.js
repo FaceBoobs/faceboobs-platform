@@ -101,7 +101,8 @@ export const LikesProvider = ({ children }) => {
       const result = await SupabaseService.toggleLike(
         parseInt(contentId),
         userAddress,
-        user?.username || `User${userAddress.substring(0, 6)}`
+        user?.username || `User${userAddress.substring(0, 6)}`,
+        user?.profileImage || user?.avatarHash || null
       );
 
       if (result.success) {

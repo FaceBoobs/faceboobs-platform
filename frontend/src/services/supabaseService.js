@@ -150,7 +150,7 @@ export class SupabaseService {
   }
 
   // Likes
-  static async toggleLike(postId, userAddress, username = null) {
+  static async toggleLike(postId, userAddress, username = null, avatarUrl = null) {
     try {
       // Check if like exists
       const { data: existingLike, error: checkError } = await supabase
@@ -200,7 +200,8 @@ export class SupabaseService {
             message: `${username || userAddress.substring(0, 8)} liked your post`,
             post_id: postId,
             from_user_address: userAddress,
-            from_username: username
+            from_username: username,
+            from_avatar_url: avatarUrl
           });
         }
 
@@ -268,7 +269,8 @@ export class SupabaseService {
           message: `${commentData.username || commentData.user_address.substring(0, 8)} commented on your post`,
           post_id: commentData.post_id,
           from_user_address: commentData.user_address,
-          from_username: commentData.username
+          from_username: commentData.username,
+          from_avatar_url: commentData.avatar || null
         });
       }
 
