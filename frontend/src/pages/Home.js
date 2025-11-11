@@ -1,5 +1,5 @@
 // src/pages/Home.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Plus, Trash2, MoreHorizontal } from 'lucide-react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../contexts/Web3Context';
@@ -33,6 +33,9 @@ const Home = () => {
   const [followingAddresses, setFollowingAddresses] = useState([]);
   const [hasFollows, setHasFollows] = useState(true);
 
+  // Ref to track processed notification postId to prevent infinite loop
+  const processedPostIdRef = useRef(null);
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!web3Loading && !account) {
@@ -64,24 +67,42 @@ const Home = () => {
 
   // Open post from notification when location state has openPostId
   useEffect(() => {
-    if (location.state?.openPostId && contents.length > 0) {
-      const postId = location.state.openPostId;
-      const post = contents.find(c => c.id === postId);
+    const openPostId = location.state?.openPostId;
+
+    // Only process if:
+    // 1. We have an openPostId
+    // 2. We haven't processed this exact postId yet
+    // 3. We have loaded contents
+    if (openPostId && processedPostIdRef.current !== openPostId && contents.length > 0) {
+      console.log('📬 Processing notification click for post:', openPostId);
+
+      // Mark as processed IMMEDIATELY to prevent re-entry
+      processedPostIdRef.current = openPostId;
+
+      // Clear the state IMMEDIATELY to prevent loop
+      navigate(location.pathname, { replace: true, state: {} });
+
+      // Try to find the post
+      const post = contents.find(c => c.id === openPostId);
 
       if (post) {
-        console.log('📬 Opening post from notification:', postId);
+        console.log('✅ Post found, opening modal:', post.id);
         setSelectedPost(post);
         setShowPostDetail(true);
-
-        // Clear the state to prevent reopening on refresh
-        navigate(location.pathname, { replace: true, state: {} });
       } else {
-        console.log('⚠️ Post not found in feed:', postId);
+        console.log('⚠️ Post not found in feed:', openPostId);
+        // Show toast only ONCE (we already marked as processed)
         toast.error('Post not found in your feed');
-        navigate(location.pathname, { replace: true, state: {} });
       }
     }
   }, [location.state, contents, navigate, toast]);
+
+  // Reset processed postId when navigating away from home
+  useEffect(() => {
+    return () => {
+      processedPostIdRef.current = null;
+    };
+  }, [location.pathname]);
 
   // Combined function that loads following list AND immediately loads posts
   const loadFollowingAndFeed = async () => {
