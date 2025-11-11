@@ -888,15 +888,24 @@ export class SupabaseService {
   }
 
   static subscribeToNotifications(userAddress, callback) {
-    return supabase
-      .channel(`notifications-${userAddress}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_address=eq.${userAddress}`
-      }, callback)
-      .subscribe();
+    try {
+      const channel = supabase.channel(`notifications-${userAddress}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_address=eq.${userAddress}`
+        }, callback)
+        .subscribe();
+
+      return channel;
+    } catch (error) {
+      console.error('❌ Error creating notification subscription:', error);
+      // Return a dummy object to prevent crashes
+      return {
+        unsubscribe: () => console.log('Dummy unsubscribe called')
+      };
+    }
   }
 
   // Messages - Build conversations dynamically from messages table

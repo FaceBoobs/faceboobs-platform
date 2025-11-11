@@ -54,22 +54,41 @@ export const NotificationsProvider = ({ children }) => {
 
     console.log('🔔 Setting up real-time notifications for:', account);
 
-    const subscription = SupabaseService.subscribeToNotifications(account, (payload) => {
-      console.log('🔔 New notification received:', payload);
+    let subscription = null;
 
-      // The payload contains the new notification in payload.new
-      const notification = payload.new;
-      if (notification) {
-        // Add new notification to the list
-        setNotifications(prev => [notification, ...prev]);
-        setUnreadCount(prev => prev + 1);
-      }
-    });
+    try {
+      subscription = SupabaseService.subscribeToNotifications(account, (payload) => {
+        try {
+          console.log('🔔 New notification received:', payload);
+
+          // The payload contains the new notification in payload.new
+          const notification = payload.new;
+          if (notification) {
+            // Add new notification to the list
+            setNotifications(prev => [notification, ...prev]);
+            setUnreadCount(prev => prev + 1);
+          }
+        } catch (error) {
+          console.error('❌ Error processing notification:', error);
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error setting up notification subscription:', error);
+    }
 
     return () => {
       console.log('🔔 Cleaning up real-time notifications');
-      if (subscription && subscription.unsubscribe) {
-        subscription.unsubscribe();
+      try {
+        if (subscription) {
+          if (typeof subscription.unsubscribe === 'function') {
+            subscription.unsubscribe();
+          } else if (subscription.channel) {
+            // Alternative cleanup method for Supabase channels
+            subscription.channel.unsubscribe();
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error cleaning up subscription:', error);
       }
     };
   }, [account]);
