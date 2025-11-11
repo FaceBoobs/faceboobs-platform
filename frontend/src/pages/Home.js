@@ -6,7 +6,7 @@ import { useWeb3 } from '../contexts/Web3Context';
 import { useLikes } from '../contexts/LikesContext';
 import { useComments } from '../contexts/CommentsContext';
 import { useToast } from '../contexts/ToastContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SupabaseService } from '../services/supabaseService';
 import { getFollowing } from '../services/followService';
 import LikeButton from '../components/LikeButton';
@@ -21,6 +21,7 @@ const Home = () => {
   const { initializeMultipleComments } = useComments();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [contents, setContents] = useState([]);
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +61,27 @@ const Home = () => {
     window.addEventListener('refreshFeed', handleRefreshFeed);
     return () => window.removeEventListener('refreshFeed', handleRefreshFeed);
   }, [account]);
+
+  // Open post from notification when location state has openPostId
+  useEffect(() => {
+    if (location.state?.openPostId && contents.length > 0) {
+      const postId = location.state.openPostId;
+      const post = contents.find(c => c.id === postId);
+
+      if (post) {
+        console.log('📬 Opening post from notification:', postId);
+        setSelectedPost(post);
+        setShowPostDetail(true);
+
+        // Clear the state to prevent reopening on refresh
+        navigate(location.pathname, { replace: true, state: {} });
+      } else {
+        console.log('⚠️ Post not found in feed:', postId);
+        toast.error('Post not found in your feed');
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [location.state, contents, navigate, toast]);
 
   // Combined function that loads following list AND immediately loads posts
   const loadFollowingAndFeed = async () => {

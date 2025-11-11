@@ -45,12 +45,21 @@ const NotificationDropdown = () => {
   };
 
   const handleNotificationClick = (notification) => {
+    // Mark as read if not already read
+    if (!notification.is_read) {
+      markAsRead(notification.id);
+    }
+
     // Navigate based on notification type
     if (notification.post_id) {
-      // Navigate to home and the post will be there
+      // Navigate to home and pass post_id in state to open the modal
+      navigate('/', { state: { openPostId: notification.post_id } });
+    } else if (notification.type === 'follow' && notification.from_user_address) {
+      // Navigate to the user's profile
+      navigate(`/profile/${notification.from_user_address}`);
+    } else {
+      // Default: navigate to home
       navigate('/');
-      // Note: In a more advanced implementation, you could open the PostDetailModal
-      // or navigate to a specific post page
     }
 
     setIsOpen(false);
