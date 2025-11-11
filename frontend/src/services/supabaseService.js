@@ -792,13 +792,51 @@ export class SupabaseService {
 
   static async getUserPurchases(userAddress) {
     try {
+      console.log('🛒 Fetching purchases for user:', userAddress);
+
       const { data, error } = await supabase
         .from('purchases')
-        .select('post_id')
-        .eq('user_address', userAddress);
+        .select(`
+          *,
+          posts:post_id (
+            id,
+            creator_address,
+            username,
+            image_url,
+            description,
+            price,
+            is_paid,
+            blockchain_content_id,
+            content_hash,
+            created_at,
+            purchase_count
+          )
+        `)
+        .eq('user_address', userAddress.toLowerCase())
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return { success: true, data: data.map(purchase => purchase.post_id) };
+
+      // Filter out purchases where post was deleted
+      const validPurchases = data.filter(purchase => purchase.posts !== null);
+
+      // Flatten the structure to include post details at the top level
+      const enrichedPurchases = validPurchases.map(purchase => ({
+        // Purchase details
+        id: purchase.id,
+        user_address: purchase.user_address,
+        post_id: purchase.post_id,
+        amount: purchase.amount,
+        transaction_hash: purchase.transaction_hash,
+        created_at: purchase.created_at,
+        // Post details
+        post: purchase.posts,
+        // Convenience fields for backward compatibility
+        blockchain_content_id: purchase.posts?.blockchain_content_id
+      }));
+
+      console.log(`✅ Found ${enrichedPurchases.length} purchases with post details`);
+      return { success: true, data: enrichedPurchases };
     } catch (error) {
       console.error('Error fetching user purchases:', error);
       return { success: false, error: error.message };
