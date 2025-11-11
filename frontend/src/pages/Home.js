@@ -35,6 +35,7 @@ const Home = () => {
 
   // Ref to track processed notification postId to prevent infinite loop
   const processedPostIdRef = useRef(null);
+  const scrollAttemptedRef = useRef(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -65,77 +66,54 @@ const Home = () => {
     return () => window.removeEventListener('refreshFeed', handleRefreshFeed);
   }, [account]);
 
-  // Open post from notification when location state has openPostId
+  // Scroll to post from notification when location state has scrollToPostId
   useEffect(() => {
-    const openPostId = location.state?.openPostId;
+    const scrollToPostId = location.state?.scrollToPostId;
 
     // Only process if:
-    // 1. We have an openPostId
-    // 2. We haven't processed this exact postId yet
-    // 3. We have loaded contents (or no contents yet on first load)
-    if (openPostId && processedPostIdRef.current !== openPostId && !loading) {
-      console.log('📬 Processing notification click for post:', openPostId);
+    // 1. We have a scrollToPostId
+    // 2. We haven't attempted scroll for this postId yet
+    // 3. We have loaded contents
+    if (scrollToPostId && processedPostIdRef.current !== scrollToPostId && !loading && contents.length > 0) {
+      console.log('📬 Processing notification click for post:', scrollToPostId);
 
       // Mark as processed IMMEDIATELY to prevent re-entry
-      processedPostIdRef.current = openPostId;
+      processedPostIdRef.current = scrollToPostId;
+      scrollAttemptedRef.current = false;
 
       // Clear the state IMMEDIATELY to prevent loop
       navigate(location.pathname, { replace: true, state: {} });
 
       // Try to find the post in current feed
-      const post = contents.find(c => c.id === openPostId);
+      const post = contents.find(c => c.id === scrollToPostId);
 
       if (post) {
-        console.log('✅ Post found in feed, opening modal:', post.id);
-        setSelectedPost(post);
-        setShowPostDetail(true);
+        console.log('✅ Post found in feed, scrolling to it:', post.id);
+
+        // Wait for DOM to update, then scroll
+        setTimeout(() => {
+          const postElement = document.getElementById(`post-${scrollToPostId}`);
+
+          if (postElement) {
+            console.log('🎯 Found post element, scrolling...');
+            postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Optional: Add flash/highlight animation
+            postElement.classList.add('ring-4', 'ring-purple-400', 'ring-opacity-50');
+            setTimeout(() => {
+              postElement.classList.remove('ring-4', 'ring-purple-400', 'ring-opacity-50');
+            }, 2000);
+          } else {
+            console.warn('⚠️ Post element not found in DOM:', `post-${scrollToPostId}`);
+            toast.error('Post not visible in feed');
+          }
+        }, 300);
       } else {
-        // Post not in feed - fetch it directly
-        console.log('🔍 Post not in feed, fetching from database:', openPostId);
-        fetchAndOpenPost(openPostId);
+        console.log('❌ Post not in feed:', scrollToPostId);
+        toast.error('Post not in your feed');
       }
     }
   }, [location.state, contents, loading, navigate, toast]);
-
-  // Fetch a single post and open it in modal
-  const fetchAndOpenPost = async (postId) => {
-    try {
-      const result = await SupabaseService.getPostById(postId);
-
-      if (result.success && result.data) {
-        console.log('✅ Post fetched successfully:', result.data);
-
-        // Convert Supabase post to expected format
-        const postData = {
-          id: result.data.id,
-          creator: result.data.creator_address,
-          creatorData: {
-            username: result.data.username || `User${result.data.creator_address?.substring(0, 6)}`,
-            profileImage: '',
-            address: result.data.creator_address,
-            isCreator: true
-          },
-          content: result.data.image_url,
-          contentHash: result.data.content_hash,
-          description: result.data.description || '',
-          isPaid: result.data.is_paid || false,
-          price: result.data.price ? result.data.price.toString() : '0',
-          blockchainContentId: result.data.blockchain_content_id || null,
-          timestamp: Math.floor(new Date(result.data.created_at).getTime() / 1000),
-          purchaseCount: result.data.purchase_count || 0
-        };
-
-        setSelectedPost(postData);
-        setShowPostDetail(true);
-      } else {
-        console.log('⚠️ Post not available:', result.error);
-        toast.error('Post not available');
-      }
-    } catch (error) {
-      console.error('❌ Error fetching post:', error);
-      toast.error('Failed to load post');
-    }
-  };
 
   // Reset processed postId when navigating away from home
   useEffect(() => {
@@ -573,7 +551,7 @@ const Home = () => {
     const isOwnPost = account && content.creator === account;
 
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+      <div id={`post-${content.id}`} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6 transition-all">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center overflow-hidden">

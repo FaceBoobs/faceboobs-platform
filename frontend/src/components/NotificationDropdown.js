@@ -52,11 +52,14 @@ const NotificationDropdown = () => {
       markAsRead(notification.id);
     }
 
+    // Close dropdown
+    setIsOpen(false);
+
     // Navigate based on notification type
     if (notification.post_id) {
       console.log('📬 Navigating to post:', notification.post_id);
-      // Navigate to home and pass post_id in state to open the modal
-      navigate('/', { state: { openPostId: notification.post_id } });
+      // Navigate to home and pass post_id in state to scroll to the post
+      navigate('/', { state: { scrollToPostId: notification.post_id } });
     } else if (notification.type === 'follow' && notification.from_user_address) {
       console.log('👤 Navigating to profile:', notification.from_user_address);
       // Navigate to the user's profile
@@ -66,8 +69,6 @@ const NotificationDropdown = () => {
       // Default: navigate to home
       navigate('/');
     }
-
-    setIsOpen(false);
   };
 
   const handleMarkAllRead = () => {
