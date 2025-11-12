@@ -794,48 +794,56 @@ export class SupabaseService {
     try {
       console.log('🛒 Fetching purchases for user:', userAddress);
 
-      const { data, error } = await supabase
+      // Step 1: Get all purchases for the user
+      const { data: purchases, error } = await supabase
         .from('purchases')
-        .select(`
-          *,
-          posts:post_id (
-            id,
-            creator_address,
-            username,
-            image_url,
-            description,
-            price,
-            is_paid,
-            blockchain_content_id,
-            content_hash,
-            created_at,
-            purchase_count
-          )
-        `)
+        .select('*')
         .eq('user_address', userAddress.toLowerCase())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Filter out purchases where post was deleted
-      const validPurchases = data.filter(purchase => purchase.posts !== null);
+      if (!purchases || purchases.length === 0) {
+        console.log('No purchases found for user');
+        return { success: true, data: [] };
+      }
 
-      // Flatten the structure to include post details at the top level
-      const enrichedPurchases = validPurchases.map(purchase => ({
-        // Purchase details
-        id: purchase.id,
-        user_address: purchase.user_address,
-        post_id: purchase.post_id,
-        amount: purchase.amount,
-        transaction_hash: purchase.transaction_hash,
-        created_at: purchase.created_at,
-        // Post details
-        post: purchase.posts,
-        // Convenience fields for backward compatibility
-        blockchain_content_id: purchase.posts?.blockchain_content_id
-      }));
+      console.log(`📦 Found ${purchases.length} purchases, loading post details...`);
 
-      console.log(`✅ Found ${enrichedPurchases.length} purchases with post details`);
+      // Step 2: Load post details for each purchase
+      const enrichedPurchases = [];
+
+      for (const purchase of purchases) {
+        try {
+          // Load post details
+          const postResult = await this.getPostById(purchase.post_id);
+
+          if (postResult.success && postResult.data) {
+            // Combine purchase and post data
+            enrichedPurchases.push({
+              // Purchase details
+              id: purchase.id,
+              user_address: purchase.user_address,
+              post_id: purchase.post_id,
+              amount: purchase.amount,
+              transaction_hash: purchase.transaction_hash,
+              created_at: purchase.created_at,
+              // Post details
+              post: postResult.data,
+              // Convenience fields for backward compatibility
+              blockchain_content_id: postResult.data.blockchain_content_id
+            });
+          } else {
+            // Post was deleted or not found, skip this purchase
+            console.log(`⚠️ Post ${purchase.post_id} not found, skipping purchase ${purchase.id}`);
+          }
+        } catch (postError) {
+          // Error loading individual post, skip but continue with others
+          console.error(`❌ Error loading post ${purchase.post_id}:`, postError);
+        }
+      }
+
+      console.log(`✅ Loaded ${enrichedPurchases.length} purchases with valid post details`);
       return { success: true, data: enrichedPurchases };
     } catch (error) {
       console.error('Error fetching user purchases:', error);
