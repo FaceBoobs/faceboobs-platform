@@ -905,7 +905,43 @@ const Home = () => {
 
         {/* Suggested Profiles Sidebar */}
         {(
-          <div className="w-80 hidden lg:block sticky top-8 self-start">
+          <div className="w-80 hidden lg:block sticky top-20 self-start space-y-6">
+            {/* Presale Banner */}
+            <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 rounded-xl shadow-lg p-6 text-white overflow-hidden relative">
+              {/* Decorative background elements */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -translate-y-16 translate-x-16"></div>
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full translate-y-12 -translate-x-12"></div>
+
+              {/* Content */}
+              <div className="relative z-10 text-center">
+                {/* Icon */}
+                <div className="text-5xl mb-3">🚀</div>
+
+                {/* Title */}
+                <h3 className="text-xl font-bold mb-2">
+                  Presale Coming Soon
+                </h3>
+
+                {/* Subtitle */}
+                <p className="text-sm opacity-90 mb-4">
+                  Be the first to invest in FaceBoobs and get exclusive early access
+                </p>
+
+                {/* CTA Button */}
+                <button
+                  disabled
+                  className="w-full bg-white text-purple-600 font-semibold py-3 px-6 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
+                >
+                  Notify Me
+                </button>
+
+                {/* Coming Soon Badge */}
+                <div className="mt-3 inline-block bg-white bg-opacity-20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium">
+                  📅 Coming Q1 2025
+                </div>
+              </div>
+            </div>
+
             <SuggestedProfiles />
           </div>
         )}
