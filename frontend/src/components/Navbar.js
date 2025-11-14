@@ -1,7 +1,7 @@
 // src/components/Navbar.js
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Home, MessageCircle, User, PlusSquare, DollarSign, LogOut, ShoppingBag } from 'lucide-react';
+import { Search, Home, MessageCircle, User, PlusSquare, DollarSign, LogOut } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
 import { SupabaseService } from '../services/supabaseService';
 import { useWeb3 } from '../contexts/Web3Context';
@@ -196,15 +196,6 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
                     >
                       <User size={16} />
                       <span>Profile</span>
-                    </Link>
-
-                    <Link
-                      to="/purchased"
-                      onClick={() => setShowUserMenu(false)}
-                      className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                    >
-                      <ShoppingBag size={16} />
-                      <span>My Purchases</span>
                     </Link>
 
                     {!user.isCreator && (

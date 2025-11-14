@@ -19,7 +19,6 @@ import NetworkStatus from './components/NetworkStatus';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Profile from './pages/Profile';
-import Purchased from './pages/Purchased';
 import CreatePost from './pages/CreatePost';
 import Earnings from './pages/Earnings';
 import Messages from './pages/Messages';
@@ -188,7 +187,6 @@ function AppContent() {
                 <Route path="/" element={<Home />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/profile/:address" element={<Profile />} />
-                <Route path="/purchased" element={<Purchased />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/create-post" element={
                   user.isCreator ?
