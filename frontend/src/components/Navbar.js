@@ -1,6 +1,6 @@
 // src/components/Navbar.js
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, Home, MessageCircle, User, PlusSquare, DollarSign, LogOut } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
 import { SupabaseService } from '../services/supabaseService';
@@ -9,13 +9,9 @@ import { useWeb3 } from '../contexts/Web3Context';
 const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loading }) => {
   const { getMediaUrl } = useWeb3();
   const location = useLocation();
+  const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
-
-  const formatAddress = (address) => {
-    if (!address) return '';
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
 
   // Load initial unread messages count
   useEffect(() => {
@@ -101,187 +97,275 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
   }
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <img
-              src={`${process.env.PUBLIC_URL}/images/fbs-logo.png`}
-              alt="FaceBoobs Logo"
-              className="h-8 w-8 object-contain"
-            />
-            <span className="font-bold text-xl text-gray-900">FaceBoobs</span>
-          </Link>
+    <>
+      {/* Desktop - Vertical Sidebar Left */}
+      <nav className="hidden md:flex fixed left-0 top-0 h-screen w-56 bg-gray-50 shadow-lg border-r border-gray-200 flex-col py-6 px-3 z-50">
+        {/* Logo at top - centered and larger */}
+        <Link to="/" className="mb-8 flex justify-center">
+          <img
+            src={`${process.env.PUBLIC_URL}/images/fbs-logo.png`}
+            alt="FaceBoobs Logo"
+            className="h-16 w-16 object-contain"
+          />
+        </Link>
 
-          {/* Navigation Items - Desktop */}
-          {user && (
-            <div className="hidden md:flex items-center space-x-8">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location.pathname === item.path;
-                const isMessages = item.path === '/messages';
-                const showBadge = isMessages && unreadMessagesCount > 0;
+        {/* Navigation Items - Vertical Center */}
+        {user && (
+          <div className="flex-1 flex flex-col space-y-4">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              const isMessages = item.path === '/messages';
+              const showBadge = isMessages && unreadMessagesCount > 0;
 
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors relative ${
-                      isActive
-                        ? 'bg-pink-50 text-pink-600'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="relative">
-                      <Icon size={20} />
-                      {showBadge && (
-                        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                          {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
-                        </div>
-                      )}
-                    </div>
-                    <span className="font-medium">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-
-          {/* User Menu */}
-          <div className="flex items-center space-x-4">
-            {account && user ? (
-              <>
-                {/* Notification Dropdown */}
-                <NotificationDropdown />
-                
-                <div className="relative">
-                <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`relative flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
+                    isActive
+                      ? 'bg-white text-pink-500 font-bold shadow-sm'
+                      : 'text-gray-700 hover:text-pink-400'
+                  }`}
                 >
-                  <div className="w-8 h-8 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center overflow-hidden">
-                    {user.avatarHash && getMediaUrl(user.avatarHash) ? (
-                      <img
-                        src={getMediaUrl(user.avatarHash)}
-                        alt={`${user.username}'s avatar`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          // Fallback to initial letter on error
-                          e.target.style.display = 'none';
-                          e.target.nextElementSibling.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    <span
-                      className="text-pink-800 font-semibold text-sm w-full h-full flex items-center justify-center"
-                      style={{ display: user.avatarHash && getMediaUrl(user.avatarHash) ? 'none' : 'flex' }}
-                    >
-                      {user.username.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="hidden md:block text-left">
-                    <div className="font-medium text-gray-900">{user.username}</div>
-                    <div className="text-sm text-gray-500">{formatAddress(account)}</div>
-                  </div>
-                </button>
+                  <Icon size={22} />
+                  <span className="text-sm">{item.label}</span>
+                  {showBadge && (
+                    <div className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1">
+                      {unreadMessagesCount > 99 ? '99' : unreadMessagesCount}
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
 
-                {/* Dropdown Menu */}
-                {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                    <Link
-                      to="/profile"
-                      onClick={() => setShowUserMenu(false)}
-                      className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                    >
-                      <User size={16} />
-                      <span>Profile</span>
-                    </Link>
+            {/* Notifications Item */}
+            <div className="relative flex items-center gap-3 px-4 py-3 rounded-2xl text-gray-700 hover:text-pink-400 transition-all">
+              <NotificationDropdown
+                iconSize={22}
+                className="relative"
+              />
+              <span className="text-sm cursor-pointer" onClick={() => navigate('/notifications')}>Notifications</span>
+            </div>
 
-                    {!user.isCreator && (
-                      <div className="border-t border-gray-100 my-1">
-                        <div className="px-4 py-2 text-sm text-gray-500">
-                          Want to earn money?
-                        </div>
-                        <button 
-                          onClick={() => {
-                            console.log('🎯 Become Creator button clicked in Navbar');
-                            setShowUserMenu(false);
-                            onBecomeCreator && onBecomeCreator();
-                          }}
-                          disabled={loading}
-                          className="w-full text-left px-4 py-2 text-blue-600 hover:bg-blue-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {loading ? 'Processing...' : 'Become a Creator'}
-                        </button>
+            {/* Earnings Item */}
+            {(() => {
+              console.log('🔍 [Navbar] Rendering Earnings - User:', user?.username, 'isCreator:', user?.isCreator);
+              return (
+                <Link
+                  to="/earnings"
+                  className={`relative flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
+                    location.pathname === '/earnings'
+                      ? 'bg-white text-pink-500 font-bold shadow-sm'
+                      : 'text-gray-700 hover:text-pink-400'
+                  }`}
+                  onClick={(e) => {
+                    if (!user?.isCreator) {
+                      console.log('⚠️ [Navbar] Non-creator clicked Earnings, redirecting anyway');
+                    }
+                  }}
+                >
+                  <DollarSign size={22} />
+                  <span className="text-sm">Earnings</span>
+                </Link>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Bottom - Profile */}
+        {account && user ? (
+          <div className="mt-4">
+            <div className="relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-gray-700 hover:text-pink-400 transition-all"
+              >
+                <div className="w-8 h-8 bg-gradient-to-r from-pink-400 to-purple-400 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {user?.avatarHash && getMediaUrl(user.avatarHash) ? (
+                    <img
+                      src={getMediaUrl(user.avatarHash)}
+                      alt={`${user?.username || 'User'}'s avatar`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextElementSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <span
+                    className="text-white font-semibold text-sm w-full h-full flex items-center justify-center"
+                    style={{ display: user?.avatarHash && getMediaUrl(user.avatarHash) ? 'none' : 'flex' }}
+                  >
+                    {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                  </span>
+                </div>
+                <span className="text-sm font-medium">Profile</span>
+              </button>
+
+              {/* Dropdown Menu */}
+              {showUserMenu && (
+                <div className="absolute left-full bottom-0 ml-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
+                  <Link
+                    to="/profile"
+                    onClick={() => setShowUserMenu(false)}
+                    className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                  >
+                    <User size={16} />
+                    <span>Profile</span>
+                  </Link>
+
+                  {!user?.isCreator && (
+                    <div className="border-t border-gray-100 my-1">
+                      <div className="px-4 py-2 text-sm text-gray-500">
+                        Want to earn money?
                       </div>
-                    )}
-                    
+                      <button
+                        onClick={() => {
+                          console.log('🎯 Become Creator button clicked in Navbar');
+                          setShowUserMenu(false);
+                          onBecomeCreator && onBecomeCreator();
+                        }}
+                        disabled={loading}
+                        className="w-full text-left px-4 py-2 text-blue-600 hover:bg-blue-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? 'Processing...' : 'Become a Creator'}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="border-t border-gray-100 my-1">
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        onDisconnect();
+                      }}
+                      className="flex items-center space-x-2 w-full px-4 py-2 text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut size={16} />
+                      <span>Disconnect</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={onConnect}
+            disabled={loading}
+            className="flex items-center gap-3 px-4 py-3 rounded-2xl text-gray-700 hover:text-pink-400 disabled:opacity-50 transition-all"
+            title="Connect Wallet"
+          >
+            <User size={22} />
+            <span className="text-sm font-medium">Connect</span>
+          </button>
+        )}
+      </nav>
+
+      {/* Mobile - Horizontal Bottom Navigation */}
+      {user && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-600 shadow-lg border-t border-pink-300 z-50">
+          <div className="flex justify-around items-center py-3 px-2">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              const isMessages = item.path === '/messages';
+              const showBadge = isMessages && unreadMessagesCount > 0;
+
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`relative flex flex-col items-center justify-center space-y-1 px-3 py-2 rounded-lg transition-all ${
+                    isActive
+                      ? 'bg-white text-pink-600 scale-110'
+                      : 'text-white'
+                  }`}
+                >
+                  <Icon size={22} />
+                  {showBadge && (
+                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                      {unreadMessagesCount > 99 ? '99' : unreadMessagesCount}
+                    </div>
+                  )}
+                  <span className="text-xs font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+
+            {/* Profile Icon on Mobile */}
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="relative flex flex-col items-center justify-center space-y-1 px-3 py-2"
+            >
+              <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center overflow-hidden">
+                {user?.avatarHash && getMediaUrl(user.avatarHash) ? (
+                  <img
+                    src={getMediaUrl(user.avatarHash)}
+                    alt={`${user?.username || 'User'}'s avatar`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextElementSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <span
+                  className="text-pink-600 font-semibold text-xs w-full h-full flex items-center justify-center"
+                  style={{ display: user?.avatarHash && getMediaUrl(user.avatarHash) ? 'none' : 'flex' }}
+                >
+                  {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                </span>
+              </div>
+              <span className="text-xs font-medium text-white">Profile</span>
+
+              {/* Mobile Dropdown */}
+              {showUserMenu && (
+                <div className="absolute bottom-16 right-0 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
+                  <Link
+                    to="/profile"
+                    onClick={() => setShowUserMenu(false)}
+                    className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                  >
+                    <User size={16} />
+                    <span>Profile</span>
+                  </Link>
+
+                  {!user?.isCreator && (
                     <div className="border-t border-gray-100 my-1">
                       <button
                         onClick={() => {
                           setShowUserMenu(false);
-                          onDisconnect();
+                          onBecomeCreator && onBecomeCreator();
                         }}
-                        className="flex items-center space-x-2 w-full px-4 py-2 text-red-600 hover:bg-red-50"
+                        disabled={loading}
+                        className="w-full text-left px-4 py-2 text-blue-600 hover:bg-blue-50 font-medium disabled:opacity-50"
                       >
-                        <LogOut size={16} />
-                        <span>Disconnect</span>
+                        {loading ? 'Processing...' : 'Become a Creator'}
                       </button>
                     </div>
+                  )}
+
+                  <div className="border-t border-gray-100 my-1">
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        onDisconnect();
+                      }}
+                      className="flex items-center space-x-2 w-full px-4 py-2 text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut size={16} />
+                      <span>Disconnect</span>
+                    </button>
                   </div>
-                )}
                 </div>
-              </>
-            ) : (
-              <button
-                onClick={onConnect}
-                disabled={loading}
-                className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
-              >
-                {loading ? 'Connecting...' : 'Connect Wallet'}
-              </button>
-            )}
+              )}
+            </button>
           </div>
-        </div>
-
-        {/* Mobile Navigation */}
-        {user && (
-          <div className="md:hidden border-t border-gray-200">
-            <div className="flex justify-around py-2">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location.pathname === item.path;
-                const isMessages = item.path === '/messages';
-                const showBadge = isMessages && unreadMessagesCount > 0;
-
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors relative ${
-                      isActive
-                        ? 'text-pink-600'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <div className="relative">
-                      <Icon size={20} />
-                      {showBadge && (
-                        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1">
-                          {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-xs font-medium">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    </nav>
+        </nav>
+      )}
+    </>
   );
 };
 

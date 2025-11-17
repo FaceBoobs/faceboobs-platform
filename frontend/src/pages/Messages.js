@@ -956,14 +956,15 @@ const Messages = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-[600px] flex">
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-[600px] flex">
       <div className="w-1/3 border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-bold text-gray-900">Messages</h1>
             <button
               onClick={handleNewChatClick}
-              className="bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 transition-colors"
+              className="bg-pink-500 text-white p-2 rounded-full hover:bg-pink-600 transition-colors"
               title="Start new conversation"
             >
               <Plus size={20} />
@@ -1230,7 +1231,7 @@ const Messages = () => {
                 <button
                   type="submit"
                   disabled={!newMessage.trim() || sendingMessage}
-                  className="bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="bg-pink-500 text-white p-2 rounded-full hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {sendingMessage ? (
                     <Loader className="animate-spin" size={20} />
@@ -1508,6 +1509,7 @@ const Messages = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

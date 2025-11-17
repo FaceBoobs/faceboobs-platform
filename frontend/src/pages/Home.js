@@ -600,14 +600,13 @@ const Home = () => {
           )}
         </div>
 
-        <div className="relative">
+        <div className="relative w-full">
           {content.isPaid && !hasAccess ? (
-            <div className="relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center mx-auto" style={{ maxHeight: '500px', maxWidth: '550px' }}>
+            <div className="relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center w-full max-h-[900px]">
               <img
                 src={content.content}
                 alt="Preview"
-                className="w-full h-auto object-contain blur-lg"
-                style={{ maxHeight: '500px' }}
+                className="w-full h-auto object-contain blur-lg max-h-[900px]"
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center text-white bg-black bg-opacity-50 p-6 rounded-lg">
@@ -627,12 +626,11 @@ const Home = () => {
               </div>
             </div>
           ) : (
-            <div className="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center mx-auto" style={{ maxHeight: '500px', maxWidth: '550px' }}>
+            <div className="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center w-full max-h-[900px]">
               <img
                 src={content.content}
                 alt="Content"
-                className="w-full h-auto object-contain cursor-pointer"
-                style={{ maxHeight: '500px' }}
+                className="w-full h-auto object-contain cursor-pointer max-h-[900px]"
                 onClick={() => {
                   setSelectedPost(content);
                   setShowPostDetail(true);
@@ -830,16 +828,16 @@ const Home = () => {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full max-w-none pl-0 pr-1">
       {/* Stories Section - Full Width */}
-      <div className="max-w-2xl mx-auto mb-6">
+      <div className="w-full mb-2">
         <StoriesCarousel />
       </div>
 
       {/* Main Content Layout */}
-      <div className="flex gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-3">
         {/* Main Feed */}
-        <div className="flex-1 max-w-2xl">
+        <div className="w-full min-w-0">
           {!loading && contents.length === 0 && !hasFollows && (
             <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl text-white p-8 mb-6 text-center">
               <div className="text-6xl mb-4">👥</div>
@@ -896,7 +894,7 @@ const Home = () => {
             </div>
           )}
 
-          <div className="space-y-6">
+          <div className="space-y-2">
             {contents.map((content) => (
               <ContentCard key={content.id} content={content} />
             ))}
@@ -905,7 +903,7 @@ const Home = () => {
 
         {/* Suggested Profiles Sidebar */}
         {(
-          <div className="w-80 hidden lg:block sticky top-20 self-start space-y-6">
+          <div className="hidden lg:block sticky top-4 self-start space-y-3 w-full">
             {/* Presale Banner */}
             <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 rounded-xl shadow-lg p-6 text-white overflow-hidden relative">
               {/* Decorative background elements */}
@@ -914,8 +912,10 @@ const Home = () => {
 
               {/* Content */}
               <div className="relative z-10 text-center">
-                {/* Icon */}
-                <div className="text-5xl mb-3">🚀</div>
+                {/* Token - Large and Prominent */}
+                <div className="text-pink-200 font-extrabold text-4xl mb-4">
+                  $FBS
+                </div>
 
                 {/* Title */}
                 <h3 className="text-xl font-bold mb-2">
@@ -929,15 +929,17 @@ const Home = () => {
 
                 {/* CTA Button */}
                 <button
-                  disabled
-                  className="w-full bg-white text-purple-600 font-semibold py-3 px-6 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
+                  onClick={() => {
+                    toast.success('🔔 You will be notified when the presale starts!');
+                  }}
+                  className="w-full bg-white text-purple-600 font-semibold py-3 px-6 rounded-lg hover:bg-purple-50 hover:scale-105 transition-all cursor-pointer shadow-md mb-3"
                 >
                   Notify Me
                 </button>
 
-                {/* Coming Soon Badge */}
-                <div className="mt-3 inline-block bg-white bg-opacity-20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium">
-                  📅 Coming Q1 2025
+                {/* Coming Date Box - Small */}
+                <div className="bg-pink-100 text-purple-800 font-medium text-xs py-2 px-4 rounded-full inline-block">
+                  Coming December 2025
                 </div>
               </div>
             </div>

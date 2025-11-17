@@ -55,9 +55,9 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
   const isOwnPost = currentUser && content.creator === currentUser.address;
 
   return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200 mb-6 overflow-hidden">
+    <div className="bg-white rounded-lg shadow-md border border-gray-200 w-full overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-gray-100">
+      <div className="p-3 border-b border-gray-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
@@ -118,8 +118,8 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
             </div>
           </div>
         ) : (
-          <div className="p-4">
-            <div className="bg-gray-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center mx-auto" style={{ maxHeight: '450px', maxWidth: '500px' }}>
+          <div className="p-0">
+            <div className="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center w-full max-h-[900px]">
               {(() => {
                 // Get display URL - check for both contentHash (localStorage) and content (base64)
                 let displayUrl = null;
@@ -138,8 +138,7 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
                   <img
                     src={displayUrl}
                     alt="Content"
-                    className="w-full h-auto object-contain"
-                    style={{ maxHeight: '450px' }}
+                    className="w-full h-auto object-contain max-h-[900px]"
                     onError={(e) => {
                       e.target.style.display = 'none';
                       e.target.nextSibling.style.display = 'flex';
@@ -160,6 +159,15 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Caption/Description */}
+        {(content.caption || content.description) && (
+          <div className="px-4 py-3">
+            <p className="text-gray-800 text-sm leading-relaxed">
+              {content.caption || content.description}
+            </p>
           </div>
         )}
 
