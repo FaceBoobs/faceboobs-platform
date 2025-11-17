@@ -181,7 +181,7 @@ function AppContent() {
             <NetworkStatus />
           )}
           
-          <main className="max-w-none mx-auto pr-1 py-2 md:pl-60 pb-20 md:pb-2">
+          <main className="max-w-none mx-auto pr-1 pt-16 md:pt-2 pb-2 md:pl-60">
             {account && user ? (
               <Routes>
                 <Route path="/" element={<Home />} />

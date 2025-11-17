@@ -1,7 +1,7 @@
 // src/components/Navbar.js
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, Home, MessageCircle, User, PlusSquare, DollarSign, LogOut } from 'lucide-react';
+import { Search, Home, MessageCircle, User, PlusSquare, DollarSign, LogOut, Menu, X, Bell } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
 import { SupabaseService } from '../services/supabaseService';
 import { useWeb3 } from '../contexts/Web3Context';
@@ -12,6 +12,7 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Load initial unread messages count
   useEffect(() => {
@@ -240,107 +241,163 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
         )}
       </nav>
 
-      {/* Mobile - Horizontal Bottom Navigation */}
+      {/* Mobile - Header Top with Hamburger Menu */}
       {user && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-600 shadow-lg border-t border-pink-300 z-50">
-          <div className="flex justify-around items-center py-3 px-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              const isMessages = item.path === '/messages';
-              const showBadge = isMessages && unreadMessagesCount > 0;
+        <>
+          {/* Mobile Header - Fixed Top */}
+          <header className="md:hidden fixed top-0 left-0 right-0 bg-white shadow-md py-3 px-4 z-40 flex items-center justify-between">
+            {/* Logo Left */}
+            <Link to="/" className="flex items-center">
+              <img
+                src={`${process.env.PUBLIC_URL}/images/fbs-logo.png`}
+                alt="FaceBoobs Logo"
+                className="h-10 w-10 object-contain"
+              />
+            </Link>
 
-              return (
+            {/* Hamburger Right */}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="p-2 text-gray-700 hover:text-pink-500 transition-colors"
+            >
+              <Menu size={28} />
+            </button>
+          </header>
+
+          {/* Mobile Sidebar - Slides in from Right */}
+          <div
+            className={`md:hidden fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+              isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+            }`}
+          >
+            {/* Sidebar Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Sidebar Content */}
+            <div className="flex flex-col h-full pb-20 overflow-y-auto">
+              {/* Navigation Items */}
+              <div className="flex-1 py-4 px-3 space-y-2">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  const isMessages = item.path === '/messages';
+                  const showBadge = isMessages && unreadMessagesCount > 0;
+
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        isActive
+                          ? 'bg-pink-50 text-pink-600 font-semibold'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Icon size={22} />
+                      <span>{item.label}</span>
+                      {showBadge && (
+                        <div className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1">
+                          {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                        </div>
+                      )}
+                    </Link>
+                  );
+                })}
+
+                {/* Notifications */}
                 <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`relative flex flex-col items-center justify-center space-y-1 px-3 py-2 rounded-lg transition-all ${
-                    isActive
-                      ? 'bg-white text-pink-600 scale-110'
-                      : 'text-white'
+                  to="/notifications"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                    location.pathname === '/notifications'
+                      ? 'bg-pink-50 text-pink-600 font-semibold'
+                      : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  <Icon size={22} />
-                  {showBadge && (
-                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                      {unreadMessagesCount > 99 ? '99' : unreadMessagesCount}
-                    </div>
-                  )}
-                  <span className="text-xs font-medium">{item.label}</span>
+                  <Bell size={22} />
+                  <span>Notifications</span>
                 </Link>
-              );
-            })}
-
-            {/* Profile Icon on Mobile */}
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="relative flex flex-col items-center justify-center space-y-1 px-3 py-2"
-            >
-              <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center overflow-hidden">
-                {user?.avatarHash && getMediaUrl(user.avatarHash) ? (
-                  <img
-                    src={getMediaUrl(user.avatarHash)}
-                    alt={`${user?.username || 'User'}'s avatar`}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextElementSibling.style.display = 'flex';
-                    }}
-                  />
-                ) : null}
-                <span
-                  className="text-pink-600 font-semibold text-xs w-full h-full flex items-center justify-center"
-                  style={{ display: user?.avatarHash && getMediaUrl(user.avatarHash) ? 'none' : 'flex' }}
-                >
-                  {user?.username?.charAt(0)?.toUpperCase() || 'U'}
-                </span>
               </div>
-              <span className="text-xs font-medium text-white">Profile</span>
 
-              {/* Mobile Dropdown */}
-              {showUserMenu && (
-                <div className="absolute bottom-16 right-0 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
-                  <Link
-                    to="/profile"
-                    onClick={() => setShowUserMenu(false)}
-                    className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                  >
-                    <User size={16} />
-                    <span>Profile</span>
-                  </Link>
-
-                  {!user?.isCreator && (
-                    <div className="border-t border-gray-100 my-1">
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          onBecomeCreator && onBecomeCreator();
+              {/* Profile Section - Bottom */}
+              <div className="border-t border-gray-200 p-4 space-y-2">
+                {/* User Info */}
+                <Link
+                  to="/profile"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-50 transition-all"
+                >
+                  <div className="w-10 h-10 bg-gradient-to-r from-pink-400 to-purple-400 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {user?.avatarHash && getMediaUrl(user.avatarHash) ? (
+                      <img
+                        src={getMediaUrl(user.avatarHash)}
+                        alt={`${user?.username || 'User'}'s avatar`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextElementSibling.style.display = 'flex';
                         }}
-                        disabled={loading}
-                        className="w-full text-left px-4 py-2 text-blue-600 hover:bg-blue-50 font-medium disabled:opacity-50"
-                      >
-                        {loading ? 'Processing...' : 'Become a Creator'}
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="border-t border-gray-100 my-1">
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        onDisconnect();
-                      }}
-                      className="flex items-center space-x-2 w-full px-4 py-2 text-red-600 hover:bg-red-50"
+                      />
+                    ) : null}
+                    <span
+                      className="text-white font-semibold text-sm w-full h-full flex items-center justify-center"
+                      style={{ display: user?.avatarHash && getMediaUrl(user.avatarHash) ? 'none' : 'flex' }}
                     >
-                      <LogOut size={16} />
-                      <span>Disconnect</span>
-                    </button>
+                      {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                    </span>
                   </div>
-                </div>
-              )}
-            </button>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900">{user?.username || 'User'}</p>
+                    <p className="text-xs text-gray-500">View Profile</p>
+                  </div>
+                </Link>
+
+                {/* Become Creator Button */}
+                {!user?.isCreator && (
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onBecomeCreator && onBecomeCreator();
+                    }}
+                    disabled={loading}
+                    className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {loading ? 'Processing...' : 'Become a Creator'}
+                  </button>
+                )}
+
+                {/* Disconnect Button */}
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onDisconnect();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 font-medium rounded-lg transition-colors"
+                >
+                  <LogOut size={18} />
+                  <span>Disconnect</span>
+                </button>
+              </div>
+            </div>
           </div>
-        </nav>
+
+          {/* Overlay - Dark Background */}
+          {isMobileMenuOpen && (
+            <div
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300"
+            />
+          )}
+        </>
       )}
     </>
   );
