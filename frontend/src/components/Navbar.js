@@ -147,29 +147,6 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
               />
               <span className="text-sm cursor-pointer" onClick={() => navigate('/notifications')}>Notifications</span>
             </div>
-
-            {/* Earnings Item */}
-            {(() => {
-              console.log('🔍 [Navbar] Rendering Earnings - User:', user?.username, 'isCreator:', user?.isCreator);
-              return (
-                <Link
-                  to="/earnings"
-                  className={`relative flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
-                    location.pathname === '/earnings'
-                      ? 'bg-white text-pink-500 font-bold shadow-sm'
-                      : 'text-gray-700 hover:text-pink-400'
-                  }`}
-                  onClick={(e) => {
-                    if (!user?.isCreator) {
-                      console.log('⚠️ [Navbar] Non-creator clicked Earnings, redirecting anyway');
-                    }
-                  }}
-                >
-                  <DollarSign size={22} />
-                  <span className="text-sm">Earnings</span>
-                </Link>
-              );
-            })()}
           </div>
         )}
 
