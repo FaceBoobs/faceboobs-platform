@@ -1184,31 +1184,23 @@ const Messages = () => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((message) => {
-                // Debug: log message structure
-                if (!message.content) {
-                  console.log('⚠️ Message without content:', message);
-                }
-                return (
+            <div className="flex-1 overflow-y-auto p-4">
+              {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex mb-3 ${message.isOwn ? 'justify-end' : 'justify-start'}`}
+                  className={message.isOwn ? "flex justify-end mb-3" : "flex justify-start mb-3"}
                 >
                   <div
-                    className={`max-w-[70%] px-4 py-3 rounded-2xl shadow-sm ${
-                      message.isOwn
-                        ? 'ml-auto bg-gradient-to-r from-pink-500 to-purple-500 text-white'
-                        : 'mr-auto bg-white text-gray-800 border border-gray-200'
-                    }`}
+                    className={message.isOwn
+                      ? "bg-pink-500 text-white rounded-xl px-4 py-2 max-w-xs shadow-md"
+                      : "bg-white text-gray-800 rounded-xl px-4 py-2 max-w-xs shadow-md border border-gray-200"
+                    }
                   >
                     {/* Media Content */}
                     {message.has_media && message.media_url && (
                       <div className="mb-2">
-                        {/* Paid Media - Locked */}
                         {message.is_paid && !message.is_unlocked && !message.isOwn ? (
                           <div className="relative">
-                            {/* Blurred Preview */}
                             <div className="relative overflow-hidden rounded">
                               {message.media_type === 'image' ? (
                                 <img
@@ -1223,77 +1215,44 @@ const Messages = () => {
                                 />
                               )}
                             </div>
-                            {/* Lock Overlay */}
                             <div
-                              className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center rounded cursor-pointer hover:bg-opacity-70 transition-all"
+                              className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center rounded cursor-pointer"
                               onClick={() => handleUnlockMedia(message)}
                             >
-                              {unlockingMedia[message.id] ? (
-                                <Loader className="animate-spin text-white mb-2" size={32} />
-                              ) : (
-                                <Lock className="text-white mb-2" size={32} />
-                              )}
-                              <p className="text-white font-bold text-sm">Locked Content</p>
-                              <p className="text-white text-xs mt-1">
-                                Unlock for {message.price} BNB
-                              </p>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleUnlockMedia(message);
-                                }}
-                                disabled={unlockingMedia[message.id]}
-                                className="mt-2 px-4 py-1 bg-blue-600 text-white text-sm rounded-full hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                              >
-                                {unlockingMedia[message.id] ? 'Unlocking...' : 'Buy Now'}
-                              </button>
+                              <Lock className="text-white mb-2" size={24} />
+                              <p className="text-white text-xs">Unlock for {message.price} BNB</p>
                             </div>
                           </div>
                         ) : (
-                          /* Free Media or Unlocked Paid Media */
                           <div>
                             {message.media_type === 'image' ? (
                               <img
                                 src={message.media_url}
                                 alt="Media"
-                                className="w-full max-h-64 object-cover rounded cursor-pointer"
-                                onClick={() => window.open(message.media_url, '_blank')}
+                                className="w-full max-h-48 object-cover rounded"
                               />
                             ) : (
                               <video
                                 src={message.media_url}
                                 controls
-                                className="w-full max-h-64 rounded"
+                                className="w-full max-h-48 rounded"
                               />
-                            )}
-                            {/* Paid badge for sender */}
-                            {message.is_paid && message.isOwn && (
-                              <div className="flex items-center gap-1 mt-1 text-xs opacity-75">
-                                <DollarSign size={12} />
-                                <span>{message.price} BNB</span>
-                              </div>
                             )}
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* Text content */}
-                    {message.content ? (
-                      <p className="text-sm">{message.content}</p>
-                    ) : (
-                      <p className="text-sm text-gray-400 italic">[No content]</p>
-                    )}
+                    {/* Text content - always show */}
+                    <p className="text-sm break-words">{message.content || '[Empty message]'}</p>
 
                     {/* Timestamp */}
-                    <p className={`text-xs mt-2 ${
-                      message.isOwn ? 'text-pink-100' : 'text-gray-500'
-                    }`}>
+                    <span className={`text-xs block mt-1 ${message.isOwn ? 'text-pink-200' : 'text-gray-500'}`}>
                       {formatMessageTime(message.timestamp)}
-                    </p>
+                    </span>
                   </div>
                 </div>
-              )})}
+              ))}
               <div ref={messagesEndRef} />
             </div>
 
