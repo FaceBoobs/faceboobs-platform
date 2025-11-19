@@ -1185,7 +1185,12 @@ const Messages = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((message) => (
+              {messages.map((message) => {
+                // Debug: log message structure
+                if (!message.content) {
+                  console.log('⚠️ Message without content:', message);
+                }
+                return (
                 <div
                   key={message.id}
                   className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}
@@ -1274,8 +1279,10 @@ const Messages = () => {
                     )}
 
                     {/* Text content */}
-                    {message.content && (
+                    {message.content ? (
                       <p className="text-sm">{message.content}</p>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">[No content]</p>
                     )}
 
                     {/* Timestamp */}
@@ -1286,7 +1293,7 @@ const Messages = () => {
                     </p>
                   </div>
                 </div>
-              ))}
+              )})}
               <div ref={messagesEndRef} />
             </div>
 
