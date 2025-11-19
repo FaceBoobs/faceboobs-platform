@@ -1185,15 +1185,17 @@ const Messages = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
-              {messages.map((message) => (
+              {messages.map((message) => {
+                const isSent = message.isOwn || message.sender_address?.toLowerCase() === account?.toLowerCase();
+                return (
                 <div
                   key={message.id}
-                  className={message.isOwn ? "flex justify-end mb-3" : "flex justify-start mb-3"}
+                  className={isSent ? "flex justify-end mb-3" : "flex justify-start mb-3"}
                 >
                   <div
-                    className={message.isOwn
-                      ? "bg-pink-500 text-white rounded-xl px-4 py-2 max-w-xs shadow-md"
-                      : "bg-white text-gray-800 rounded-xl px-4 py-2 max-w-xs shadow-md border border-gray-200"
+                    className={isSent
+                      ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl px-4 py-2 max-w-[70%] shadow-lg"
+                      : "bg-white text-gray-800 rounded-2xl px-4 py-2 max-w-[70%] shadow-md border border-gray-200"
                     }
                   >
                     {/* Media Content */}
@@ -1247,12 +1249,13 @@ const Messages = () => {
                     <p className="text-sm break-words">{message.content || '[Empty message]'}</p>
 
                     {/* Timestamp */}
-                    <span className={`text-xs block mt-1 ${message.isOwn ? 'text-pink-200' : 'text-gray-500'}`}>
+                    <span className={`text-xs block mt-1 ${isSent ? 'text-pink-200' : 'text-gray-500'}`}>
                       {formatMessageTime(message.timestamp)}
                     </span>
                   </div>
                 </div>
-              ))}
+              );
+              })}
               <div ref={messagesEndRef} />
             </div>
 
