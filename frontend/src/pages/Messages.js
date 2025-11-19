@@ -1193,13 +1193,13 @@ const Messages = () => {
                 return (
                 <div
                   key={message.id}
-                  className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}
+                  className={`flex mb-3 ${message.isOwn ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                    className={`max-w-[70%] px-4 py-3 rounded-2xl shadow-sm ${
                       message.isOwn
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-200 text-gray-900'
+                        ? 'ml-auto bg-gradient-to-r from-pink-500 to-purple-500 text-white'
+                        : 'mr-auto bg-white text-gray-800 border border-gray-200'
                     }`}
                   >
                     {/* Media Content */}
@@ -1286,8 +1286,8 @@ const Messages = () => {
                     )}
 
                     {/* Timestamp */}
-                    <p className={`text-xs mt-1 ${
-                      message.isOwn ? 'text-blue-100' : 'text-gray-500'
+                    <p className={`text-xs mt-2 ${
+                      message.isOwn ? 'text-pink-100' : 'text-gray-500'
                     }`}>
                       {formatMessageTime(message.timestamp)}
                     </p>
