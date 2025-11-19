@@ -173,6 +173,47 @@ export class SupabaseService {
     }
   }
 
+  // Get stories only from users that the current user follows
+  static async getFollowingStories(userAddress) {
+    try {
+      // First cleanup expired stories
+      await supabase
+        .from('stories')
+        .delete()
+        .lt('expires_at', new Date().toISOString());
+
+      // Get list of users the current user follows
+      const { data: followingData, error: followingError } = await supabase
+        .from('follows')
+        .select('following_address')
+        .eq('follower_address', userAddress);
+
+      if (followingError) throw followingError;
+
+      // Extract addresses of followed users
+      const followingAddresses = followingData?.map(f => f.following_address) || [];
+
+      // If not following anyone, return empty array
+      if (followingAddresses.length === 0) {
+        return { success: true, data: [], noFollows: true };
+      }
+
+      // Fetch active stories only from followed users
+      const { data, error } = await supabase
+        .from('stories')
+        .select('*')
+        .in('creator_address', followingAddresses)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error fetching following stories:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Likes
   static async toggleLike(postId, userAddress, username = null, avatarUrl = null) {
     try {

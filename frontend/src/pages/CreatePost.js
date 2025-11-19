@@ -6,7 +6,6 @@ import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import { SupabaseService } from '../services/supabaseService';
-import CompressionIndicator from '../components/CompressionIndicator';
 
 const CreatePost = () => {
   const { account, user, contract } = useWeb3(); // Added contract from context
@@ -21,8 +20,6 @@ const CreatePost = () => {
   });
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [compressionData, setCompressionData] = useState(null);
-  const [compressionProfile, setCompressionProfile] = useState('standard');
 
   // Upload image function (placeholder for IPFS or cloud storage)
   const uploadImage = async (file) => {
@@ -107,18 +104,7 @@ const CreatePost = () => {
       }
       
       setFormData({ ...formData, file });
-      
-      // Set compression data for images
-      if (file.type.startsWith('image/')) {
-        setCompressionData({
-          originalSize: file.size,
-          compressedSize: null,
-          profile: compressionProfile
-        });
-      } else {
-        setCompressionData(null);
-      }
-      
+
       // Create preview
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
@@ -153,13 +139,6 @@ const CreatePost = () => {
       let base64Data;
       if (formData.file.type.startsWith('image/')) {
         base64Data = await compressImage(formData.file, 0.95);
-        
-        // Update compression data
-        const compressedSize = Math.round((base64Data.length * 3) / 4);
-        setCompressionData(prev => ({
-          ...prev,
-          compressedSize
-        }));
       } else {
         // For videos, convert to base64 without compression
         const reader = new FileReader();
@@ -312,7 +291,6 @@ const CreatePost = () => {
         description: ''
       });
       setPreview(null);
-      setCompressionData(null);
 
       // Trigger feed refresh
       window.dispatchEvent(new CustomEvent('refreshFeed'));
@@ -409,11 +387,10 @@ const CreatePost = () => {
         description: ''
       });
       setPreview(null);
-      setCompressionData(null);
-      
+
       // Trigger refresh
       window.dispatchEvent(new CustomEvent('refreshFeed'));
-      
+
       // Navigate to home
       setTimeout(() => {
         navigate('/');
@@ -476,7 +453,6 @@ const CreatePost = () => {
                   onClick={() => {
                     setPreview(null);
                     setFormData({ ...formData, file: null });
-                    setCompressionData(null);
                     toast.info('File removed');
                   }}
                   className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 transition-colors"
@@ -491,17 +467,6 @@ const CreatePost = () => {
                   )}
                 </div>
               </div>
-            )}
-
-            {/* Compression Indicator */}
-            {compressionData && formData.file && formData.file.type.startsWith('image/') && (
-              <CompressionIndicator
-                originalSize={compressionData.originalSize}
-                compressedSize={compressionData.compressedSize}
-                compressionProfile={compressionProfile}
-                onProfileChange={setCompressionProfile}
-                className="mt-4"
-              />
             )}
           </div>
 

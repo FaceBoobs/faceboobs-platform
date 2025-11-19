@@ -235,16 +235,23 @@ const Home = () => {
 
   const loadStoriesData = async () => {
     try {
-      console.log('Loading stories from Supabase...');
+      console.log('Loading stories from followed users...');
 
-      const result = await SupabaseService.getActiveStories();
+      // Get stories only from users the current user follows
+      const result = await SupabaseService.getFollowingStories(account);
 
       if (!result.success) {
         console.error('Error loading stories:', result.error);
         return;
       }
 
-      console.log(`Loaded ${result.data.length} active stories from Supabase`);
+      if (result.noFollows) {
+        console.log('📭 Not following anyone, no stories to show');
+        setStories([]);
+        return;
+      }
+
+      console.log(`Loaded ${result.data.length} stories from followed users`);
 
       // Convert to expected format
       const storiesData = result.data.map(story => ({
