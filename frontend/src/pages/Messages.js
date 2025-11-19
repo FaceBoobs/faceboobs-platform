@@ -524,15 +524,22 @@ const Messages = () => {
         isOwn: true
       };
 
+      console.log('📝 Adding message to state:', newMessageObj);
+
       // Add to messages state immediately
-      setMessages(prev => [...prev, newMessageObj]);
+      setMessages(prev => {
+        console.log('📊 Previous messages count:', prev.length);
+        const updated = [...prev, newMessageObj];
+        console.log('📊 Updated messages count:', updated.length);
+        return updated;
+      });
 
       // Clear form
       setNewMessage('');
 
-      // Update conversations
+      // Update conversations (use lowercase comparison)
       setConversations(prev => prev.map(conv =>
-        conv.address === activeChat.address
+        conv.address?.toLowerCase() === activeChat.address?.toLowerCase()
           ? {
               ...conv,
               lastMessage: messageData.content,
