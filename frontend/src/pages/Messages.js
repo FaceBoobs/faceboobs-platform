@@ -105,9 +105,15 @@ const Messages = () => {
               id: payload.new.id,
               sender_address: payload.new.sender_address,
               content: payload.new.content,
+              has_media: payload.new.has_media || false,
+              media_url: payload.new.media_url,
+              media_type: payload.new.media_type,
+              is_paid: payload.new.is_paid || false,
+              price: payload.new.price || 0,
+              is_unlocked: true,
               created_at: payload.new.created_at,
               timestamp: new Date(payload.new.created_at).getTime(),
-              isOwn: payload.new.sender_address === account
+              isOwn: payload.new.sender_address?.toLowerCase() === account?.toLowerCase()
             };
 
             // Avoid duplicates by checking if message already exists
@@ -246,8 +252,8 @@ const Messages = () => {
         const conversationsMap = new Map();
 
         result.data.forEach(message => {
-          // Determine the other participant
-          const otherParticipant = message.sender_address === account
+          // Determine the other participant (use lowercase comparison)
+          const otherParticipant = message.sender_address?.toLowerCase() === account?.toLowerCase()
             ? message.receiver_address
             : message.sender_address;
 
@@ -387,7 +393,7 @@ const Messages = () => {
             let isUnlocked = true;
 
             // If message has paid media and user is not the sender, check if unlocked
-            if (message.has_media && message.is_paid && message.sender_address !== account) {
+            if (message.has_media && message.is_paid && message.sender_address?.toLowerCase() !== account?.toLowerCase()) {
               const { data: purchase } = await supabase
                 .from('message_purchases')
                 .select('*')
@@ -412,7 +418,7 @@ const Messages = () => {
               is_unlocked: isUnlocked,
               created_at: message.created_at,
               timestamp: new Date(message.created_at).getTime(),
-              isOwn: message.sender_address === account
+              isOwn: message.sender_address?.toLowerCase() === account?.toLowerCase()
             };
           })
         );
