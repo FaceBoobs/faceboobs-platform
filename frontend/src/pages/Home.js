@@ -602,11 +602,11 @@ const Home = () => {
 
         <div className="relative w-full">
           {content.isPaid && !hasAccess ? (
-            <div className="relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center w-full max-h-[900px]">
+            <div className="relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center w-full max-h-[500px] md:max-h-[900px]">
               <img
                 src={content.content}
                 alt="Preview"
-                className="w-full h-auto object-contain blur-lg max-h-[900px]"
+                className="w-full h-auto object-contain blur-lg max-h-[500px] md:max-h-[900px]"
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center text-white bg-black bg-opacity-50 p-6 rounded-lg">
@@ -626,11 +626,11 @@ const Home = () => {
               </div>
             </div>
           ) : (
-            <div className="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center w-full max-h-[900px]">
+            <div className="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center w-full max-h-[500px] md:max-h-[900px]">
               <img
                 src={content.content}
                 alt="Content"
-                className="w-full h-auto object-contain cursor-pointer max-h-[900px]"
+                className="w-full h-auto object-contain cursor-pointer max-h-[500px] md:max-h-[900px]"
                 onClick={() => {
                   setSelectedPost(content);
                   setShowPostDetail(true);
@@ -828,14 +828,14 @@ const Home = () => {
   }
 
   return (
-    <div className="w-full max-w-none pl-0 pr-1">
+    <div className="w-full">
       {/* Stories Section - Full Width */}
-      <div className="w-full mb-2">
+      <div className="w-full mb-4">
         <StoriesCarousel />
       </div>
 
       {/* Main Content Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-3">
+      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_400px] gap-2 md:gap-4">
         {/* Main Feed */}
         <div className="w-full min-w-0">
           {!loading && contents.length === 0 && !hasFollows && (

@@ -181,7 +181,7 @@ function AppContent() {
             <NetworkStatus />
           )}
           
-          <main className="max-w-none mx-auto pr-1 pt-16 md:pt-2 pb-2 md:pl-60">
+          <main className="max-w-none mx-auto px-4 pt-16 md:pt-2 pb-2 md:pl-60">
             {account && user ? (
               <Routes>
                 <Route path="/" element={<Home />} />
@@ -248,6 +248,7 @@ function AppContent() {
                   <Navigate to="/" />
                 } />
                 <Route path="/messages" element={<Messages />} />
+                <Route path="/messages/:conversationId" element={<Messages />} />
                 <Route path="/search" element={<Search />} />
                 {process.env.NODE_ENV === 'development' && (
                   <Route path="/upload-test" element={<UploadTest />} />

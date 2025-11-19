@@ -118,14 +118,14 @@ const Search = () => {
     };
 
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer">
-        <div className="flex items-center space-x-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 hover:shadow-md transition-shadow cursor-pointer">
+        <div className="flex items-center space-x-3 md:space-x-4">
           <Link
             to={`/profile/${userData.wallet_address}`}
             className="relative flex-shrink-0"
           >
-            <div className="w-16 h-16 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center">
-              <span className="text-pink-800 text-xl font-bold">
+            <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center">
+              <span className="text-pink-800 text-lg md:text-xl font-bold">
                 {userData.username?.charAt(0).toUpperCase() || '?'}
               </span>
             </div>
@@ -188,9 +188,9 @@ const Search = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Discover People</h1>
+    <div className="max-w-4xl mx-auto space-y-4 md:space-y-6 px-0 md:px-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-3 md:mb-4">Discover People</h1>
         
         <div className="relative mb-4">
           <SearchIcon className="absolute left-3 top-3 text-gray-400" size={20} />
@@ -204,13 +204,13 @@ const Search = () => {
           />
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
           <div className="flex items-center space-x-4">
             <div className="flex items-center">
               <Filter size={16} className="text-gray-500 mr-2" />
-              <span className="text-sm text-gray-700">Filters:</span>
+              <span className="text-xs md:text-sm text-gray-700">Filters:</span>
             </div>
-            
+
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -218,13 +218,13 @@ const Search = () => {
                 onChange={(e) => setFilterCreatorsOnly(e.target.checked)}
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              <span className="text-sm text-gray-700">Creators only</span>
+              <span className="text-xs md:text-sm text-gray-700">Creators only</span>
             </label>
           </div>
 
           <button
             onClick={performSearch}
-            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm md:text-base w-full md:w-auto"
           >
             Search
           </button>
@@ -233,16 +233,16 @@ const Search = () => {
 
       {searchQuery.trim() && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
+          <div className="p-4 md:p-6 border-b border-gray-200">
+            <h2 className="text-base md:text-lg font-semibold text-gray-900">
               Search Results for "{searchQuery}"
             </h2>
-            <p className="text-gray-600">
+            <p className="text-sm md:text-base text-gray-600">
               {loading ? 'Searching...' : `${searchResults.length} results found`}
             </p>
           </div>
 
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             {loading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (

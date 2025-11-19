@@ -428,21 +428,21 @@ const CreatePost = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto px-0 md:px-4">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="border-b border-gray-200 p-6">
-          <h1 className="text-2xl font-bold text-gray-900">Create New Content</h1>
-          <p className="text-gray-600 mt-1">Share your creativity with the world</p>
+        <div className="border-b border-gray-200 p-4 md:p-6">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Create New Content</h1>
+          <p className="text-sm md:text-base text-gray-600 mt-1">Share your creativity with the world</p>
         </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+
+        <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-4 md:space-y-6">
           <div className="space-y-4">
             <label className="block text-sm font-medium text-gray-700">Upload Media</label>
             
-            <div className="flex space-x-4">
-              <label className="flex-1 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer">
-                <Upload size={32} className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-600">Click to upload</p>
+            <div className="flex">
+              <label className="flex-1 border-2 border-dashed border-gray-300 rounded-lg p-4 md:p-6 text-center hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer">
+                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
+                <p className="text-xs md:text-sm text-gray-600">Click to upload</p>
                 <p className="text-xs text-gray-500">PNG, JPG, GIF, MP4 up to 10MB</p>
                 <input
                   type="file"
@@ -456,18 +456,18 @@ const CreatePost = () => {
             {preview && (
               <div className="relative">
                 {preview === 'video-placeholder' ? (
-                  <div className="w-full h-64 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                  <div className="w-full h-48 md:h-64 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg border border-gray-200 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="text-4xl mb-2">🎥</div>
-                      <p className="text-gray-600 font-medium">Video Selected</p>
-                      <p className="text-sm text-gray-500">{formData.file?.name}</p>
+                      <div className="text-3xl md:text-4xl mb-2">🎥</div>
+                      <p className="text-sm md:text-base text-gray-600 font-medium">Video Selected</p>
+                      <p className="text-xs md:text-sm text-gray-500">{formData.file?.name}</p>
                     </div>
                   </div>
                 ) : (
                   <img
                     src={preview}
                     alt="Preview"
-                    className="w-full h-64 object-cover rounded-lg border border-gray-200"
+                    className="w-full h-48 md:h-64 object-cover rounded-lg border border-gray-200"
                   />
                 )}
                 
@@ -575,28 +575,28 @@ const CreatePost = () => {
             </div>
           )}
 
-          <div className="flex space-x-4">
+          <div className="flex flex-col md:flex-row gap-3 md:space-x-4">
             <button
               type="submit"
               disabled={uploading || !formData.file}
-              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm md:text-base"
             >
               {uploading ? 'Creating...' : 'Create Post'}
             </button>
-            
+
             <button
               type="button"
               onClick={createStoryHandler}
               disabled={uploading || !formData.file}
-              className="bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm md:text-base"
             >
               Story
             </button>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">Enhanced Features</h3>
-            <ul className="text-sm text-blue-800 space-y-1">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
+            <h3 className="font-semibold text-blue-900 mb-2 text-sm md:text-base">Enhanced Features</h3>
+            <ul className="text-xs md:text-sm text-blue-800 space-y-1">
               <li>• Content saved to Supabase database</li>
               <li>• Images automatically compressed</li>
               <li>• Stories expire after 24 hours</li>

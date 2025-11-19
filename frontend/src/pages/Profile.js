@@ -400,8 +400,8 @@ const Profile = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <div className="max-w-4xl mx-auto px-0 md:px-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-4 md:mb-6">
         <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
           <div className="relative">
             <div className="w-24 h-24 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center overflow-hidden">
@@ -433,18 +433,18 @@ const Profile = () => {
           </div>
 
           <div className="flex-1">
-            <div className="flex flex-col md:flex-row md:items-center md:space-x-4 mb-4">
-              <h1 className="text-2xl font-bold text-gray-900">{profileData.username}</h1>
+            <div className="flex flex-col md:flex-row md:items-center md:space-x-4 mb-2 md:mb-4">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">{profileData.username}</h1>
               {profileData.isCreator && (
-                <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
+                <span className="bg-purple-100 text-purple-800 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-medium mt-1 md:mt-0 w-fit">
                   Creator
                 </span>
               )}
             </div>
 
-            <p className="text-gray-600 mb-4">{profileData.bio}</p>
+            <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4">{profileData.bio}</p>
 
-            <div className="flex space-x-6 text-sm">
+            <div className="flex space-x-4 md:space-x-6 text-xs md:text-sm">
               <div className="text-center">
                 <div className="font-bold text-gray-900">{userContents.length}</div>
                 <div className="text-gray-600">Posts</div>
@@ -509,11 +509,11 @@ const Profile = () => {
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-2 md:p-6">
           {userContents.length === 0 ? (
-            <div className="text-center py-12">
+            <div className="text-center py-8 md:py-12">
               <Grid size={48} className="mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-500 mb-2">No posts yet</h3>
+              <h3 className="text-base md:text-lg font-medium text-gray-500 mb-2">No posts yet</h3>
               <p className="text-gray-400">
                 {isOwnProfile ? 'Share your first post!' : 'This user hasn\'t posted anything yet.'}
               </p>

@@ -195,87 +195,87 @@ const Earnings = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-4 md:space-y-6 px-0 md:px-4">
       {/* Header */}
       <div
-        className="rounded-xl text-white p-8 shadow-lg"
+        className="rounded-xl text-white p-4 md:p-8 shadow-lg"
         style={{ background: 'linear-gradient(135deg, #d63bad 0%, #ff6bc9 50%, #ffe6f7 100%)' }}
       >
-        <h1 className="text-4xl font-bold mb-2">💰 Creator Earnings</h1>
-        <p className="opacity-90 text-lg">Track your performance and manage your earnings</p>
+        <h1 className="text-2xl md:text-4xl font-bold mb-2">💰 Creator Earnings</h1>
+        <p className="opacity-90 text-sm md:text-lg">Track your performance and manage your earnings</p>
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
         {/* Total Earned */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-700">Total Earned</h3>
-            <div className="p-2 bg-green-100 rounded-lg">
-              <DollarSign className="text-green-600" size={24} />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <h3 className="font-semibold text-gray-700 text-xs md:text-base">Total Earned</h3>
+            <div className="p-1 md:p-2 bg-green-100 rounded-lg">
+              <DollarSign className="text-green-600" size={16} />
             </div>
           </div>
-          <div className="text-3xl font-bold text-gray-900">{parseFloat(earnings.totalEarned).toFixed(4)}</div>
-          <div className="text-sm text-gray-500 mt-1">BNB (all time)</div>
-          <div className="text-xs text-gray-400 mt-2">≈ ${(parseFloat(earnings.totalEarned) * 300).toFixed(2)} USD</div>
+          <div className="text-lg md:text-3xl font-bold text-gray-900">{parseFloat(earnings.totalEarned).toFixed(4)}</div>
+          <div className="text-xs md:text-sm text-gray-500 mt-1">BNB (all time)</div>
+          <div className="text-xs text-gray-400 mt-1 md:mt-2 hidden md:block">≈ ${(parseFloat(earnings.totalEarned) * 300).toFixed(2)} USD</div>
         </div>
 
         {/* Available Balance */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-700">Available</h3>
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <TrendingUp className="text-blue-600" size={24} />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <h3 className="font-semibold text-gray-700 text-xs md:text-base">Available</h3>
+            <div className="p-1 md:p-2 bg-blue-100 rounded-lg">
+              <TrendingUp className="text-blue-600" size={16} />
             </div>
           </div>
-          <div className="text-3xl font-bold text-blue-600">{parseFloat(earnings.availableBalance).toFixed(4)}</div>
-          <div className="text-sm text-gray-500 mt-1">BNB (withdrawable)</div>
-          <div className="text-xs text-green-600 mt-2 font-medium">Ready to withdraw</div>
+          <div className="text-lg md:text-3xl font-bold text-blue-600">{parseFloat(earnings.availableBalance).toFixed(4)}</div>
+          <div className="text-xs md:text-sm text-gray-500 mt-1">BNB</div>
+          <div className="text-xs text-green-600 mt-1 md:mt-2 font-medium hidden md:block">Ready to withdraw</div>
         </div>
 
         {/* Already Withdrawn */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-700">Withdrawn</h3>
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <CheckCircle className="text-purple-600" size={24} />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <h3 className="font-semibold text-gray-700 text-xs md:text-base">Withdrawn</h3>
+            <div className="p-1 md:p-2 bg-purple-100 rounded-lg">
+              <CheckCircle className="text-purple-600" size={16} />
             </div>
           </div>
-          <div className="text-3xl font-bold text-gray-900">{parseFloat(earnings.alreadyWithdrawn).toFixed(4)}</div>
-          <div className="text-sm text-gray-500 mt-1">BNB (historical)</div>
+          <div className="text-lg md:text-3xl font-bold text-gray-900">{parseFloat(earnings.alreadyWithdrawn).toFixed(4)}</div>
+          <div className="text-xs md:text-sm text-gray-500 mt-1">BNB</div>
         </div>
 
         {/* Total Sales */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-700">Total Sales</h3>
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <ShoppingBag className="text-orange-600" size={24} />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <h3 className="font-semibold text-gray-700 text-xs md:text-base">Total Sales</h3>
+            <div className="p-1 md:p-2 bg-orange-100 rounded-lg">
+              <ShoppingBag className="text-orange-600" size={16} />
             </div>
           </div>
-          <div className="text-3xl font-bold text-gray-900">{earnings.totalSales}</div>
-          <div className="text-sm text-gray-500 mt-1">Content purchases</div>
+          <div className="text-lg md:text-3xl font-bold text-gray-900">{earnings.totalSales}</div>
+          <div className="text-xs md:text-sm text-gray-500 mt-1">Purchases</div>
         </div>
       </div>
 
       {/* Withdraw Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
           <div className="flex-1">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Withdraw Earnings</h3>
-            <p className="text-gray-600">
-              You have <span className="font-bold text-green-600">{parseFloat(earnings.availableBalance).toFixed(4)} BNB</span> available to withdraw
+            <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-2">Withdraw Earnings</h3>
+            <p className="text-sm md:text-base text-gray-600">
+              You have <span className="font-bold text-green-600">{parseFloat(earnings.availableBalance).toFixed(4)} BNB</span> available
             </p>
-            <p className="text-sm text-gray-500 mt-1">
-              Platform fee: 2% • You receive: 98% of each sale
+            <p className="text-xs md:text-sm text-gray-500 mt-1">
+              Platform fee: 2% • You receive: 98%
             </p>
           </div>
           <button
             onClick={handleWithdrawClick}
             disabled={withdrawing || parseFloat(earnings.availableBalance) <= 0}
-            className="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+            className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2 font-semibold shadow-lg text-sm md:text-base w-full md:w-auto"
           >
-            <Download size={24} />
+            <Download size={20} />
             <span>{withdrawing ? 'Processing...' : 'Withdraw All'}</span>
           </button>
         </div>
@@ -292,16 +292,16 @@ const Earnings = () => {
 
       {/* Recent Transactions Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
-          <h3 className="text-xl font-semibold text-gray-900">Recent Transactions</h3>
-          <p className="text-gray-600 mt-1">History of your content purchases</p>
+        <div className="p-4 md:p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+          <h3 className="text-lg md:text-xl font-semibold text-gray-900">Recent Transactions</h3>
+          <p className="text-sm md:text-base text-gray-600 mt-1">History of your content purchases</p>
         </div>
 
         {recentTransactions.length === 0 ? (
-          <div className="p-12 text-center">
-            <ShoppingBag size={48} className="mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-500 mb-2">No transactions yet</h3>
-            <p className="text-gray-400 mb-4">Your sales will appear here once users purchase your content</p>
+          <div className="p-8 md:p-12 text-center">
+            <ShoppingBag size={40} className="mx-auto text-gray-300 mb-4" />
+            <h3 className="text-base md:text-lg font-medium text-gray-500 mb-2">No transactions yet</h3>
+            <p className="text-sm text-gray-400 mb-4">Your sales will appear here once users purchase your content</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -379,28 +379,28 @@ const Earnings = () => {
 
       {/* Withdraw Confirmation Modal */}
       {showWithdrawConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Withdrawal</h3>
-            <p className="text-gray-600 mb-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
+          <div className="bg-white rounded-t-xl md:rounded-xl w-full md:max-w-md p-4 md:p-6 shadow-2xl">
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4">Confirm Withdrawal</h3>
+            <p className="text-sm md:text-base text-gray-600 mb-4 md:mb-6">
               You are about to withdraw <span className="font-bold text-green-600">{parseFloat(earnings.availableBalance).toFixed(4)} BNB</span> to your wallet.
             </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <p className="text-sm text-blue-800">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4 mb-4 md:mb-6">
+              <p className="text-xs md:text-sm text-blue-800">
                 <strong>Note:</strong> This will send all your available earnings to your connected wallet address.
                 Gas fees will be deducted from your wallet balance.
               </p>
             </div>
-            <div className="flex space-x-4">
+            <div className="flex flex-col md:flex-row gap-3 md:space-x-4">
               <button
                 onClick={() => setShowWithdrawConfirm(false)}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm md:text-base"
               >
                 Cancel
               </button>
               <button
                 onClick={handleWithdrawConfirm}
-                className="flex-1 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold"
+                className="flex-1 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm md:text-base"
               >
                 Confirm Withdraw
               </button>

@@ -1,12 +1,13 @@
 // src/pages/Messages.js
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Search, Plus, X, Loader, Paperclip, Image as ImageIcon, Video, DollarSign, Lock } from 'lucide-react';
+import { Send, Search, Plus, X, Loader, Paperclip, Image as ImageIcon, Video, DollarSign, Lock, ArrowLeft } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { SupabaseService } from '../services/supabaseService';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { supabase } from '../supabaseClient';
 import { ethers } from 'ethers';
+import { useNavigate, useParams } from 'react-router-dom';
 import CONTRACT_ABI from '../contracts/SocialPlatform.json';
 
 // Smart contract configuration
@@ -15,6 +16,8 @@ const CONTRACT_ADDRESS = "0x575e0532445489dd31C12615BeC7C63d737B69DD";
 const Messages = () => {
   const { user, account, loading, getMediaUrl } = useWeb3();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { conversationId } = useParams();
   const [conversations, setConversations] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -27,8 +30,39 @@ const Messages = () => {
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const messagesEndRef = useRef(null);
   const messageSubscriptionRef = useRef(null);
+
+  // Handle window resize for responsive layout
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Handle conversationId from URL (for mobile navigation)
+  useEffect(() => {
+    if (conversationId && conversations.length > 0) {
+      const conversation = conversations.find(c => c.address === conversationId);
+      if (conversation) {
+        setActiveChat(conversation);
+      } else {
+        // Create temporary conversation object for direct URL access
+        setActiveChat({
+          id: conversationId,
+          username: `User${conversationId.substring(0, 6)}`,
+          address: conversationId,
+          lastMessage: '',
+          timestamp: Date.now(),
+          unread: false,
+          avatar: conversationId.charAt(2).toUpperCase()
+        });
+      }
+    }
+  }, [conversationId, conversations]);
 
   // Media upload states
   const [showMediaModal, setShowMediaModal] = useState(false);
@@ -288,7 +322,8 @@ const Messages = () => {
         console.log('✅ Loaded conversations:', conversationsWithUserData);
         setConversations(conversationsWithUserData);
 
-        if (conversationsWithUserData.length > 0) {
+        // Only auto-select first conversation on desktop (not mobile) and when no URL param
+        if (conversationsWithUserData.length > 0 && !isMobile && !conversationId) {
           setActiveChat(conversationsWithUserData[0]);
         }
       } else {
@@ -908,9 +943,6 @@ const Messages = () => {
       avatarUrl: selectedUser.avatarUrl || null
     };
 
-    // Set as active chat
-    setActiveChat(newChat);
-
     // Add to conversations if not already there
     setConversations(prev => {
       const exists = prev.some(conv => conv.address === selectedUser.address);
@@ -923,8 +955,29 @@ const Messages = () => {
     // Close modal
     setShowNewChatModal(false);
 
-    // Load messages (will be empty for new chat)
-    loadMessages(selectedUser.address);
+    // On mobile, navigate to conversation route
+    if (isMobile) {
+      navigate(`/messages/${selectedUser.address}`);
+    } else {
+      // On desktop, just set active chat
+      setActiveChat(newChat);
+      loadMessages(selectedUser.address);
+    }
+  };
+
+  // Handle conversation click
+  const handleConversationClick = (conversation) => {
+    if (isMobile) {
+      navigate(`/messages/${conversation.address}`);
+    } else {
+      setActiveChat(conversation);
+    }
+  };
+
+  // Handle back button on mobile
+  const handleBackToList = () => {
+    navigate('/messages');
+    setActiveChat(null);
   };
 
   const filteredConversations = conversations.filter(conv =>
@@ -955,10 +1008,16 @@ const Messages = () => {
     );
   }
 
+  // Determine what to show based on mobile/desktop and URL
+  const showChatView = isMobile ? !!conversationId : true;
+  const showListView = isMobile ? !conversationId : true;
+
   return (
     <div className="flex items-center justify-center min-h-screen">
-      <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-[600px] flex">
-      <div className="w-1/3 border-r border-gray-200 flex flex-col">
+      <div className="w-full md:max-w-6xl mx-auto bg-white md:rounded-xl md:shadow-sm md:border md:border-gray-200 overflow-hidden h-screen md:h-[600px] flex">
+
+      {/* Conversation List - Hidden on mobile when viewing chat */}
+      <div className={`${showListView ? 'flex' : 'hidden'} ${isMobile ? 'w-full' : 'w-1/3'} border-r border-gray-200 flex-col`}>
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-bold text-gray-900">Messages</h1>
@@ -998,7 +1057,7 @@ const Messages = () => {
               return (
                 <button
                   key={conversation.address}
-                  onClick={() => setActiveChat(conversation)}
+                  onClick={() => handleConversationClick(conversation)}
                   className={`w-full p-4 border-b border-gray-100 transition-colors text-left ${
                     isActive
                       ? 'bg-blue-50 border-blue-200'
@@ -1058,11 +1117,21 @@ const Messages = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col">
+      {/* Chat View - Hidden on mobile when viewing list */}
+      <div className={`${showChatView ? 'flex' : 'hidden'} flex-1 flex-col`}>
         {activeChat ? (
           <>
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center space-x-3">
+                {/* Back button for mobile */}
+                {isMobile && (
+                  <button
+                    onClick={handleBackToList}
+                    className="p-2 -ml-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <ArrowLeft size={24} />
+                  </button>
+                )}
                 <div className="w-10 h-10 rounded-full bg-gradient-to-r from-pink-400 to-white flex items-center justify-center overflow-hidden flex-shrink-0">
                   {activeChat.avatarUrl && getMediaUrl(activeChat.avatarUrl) ? (
                     <img
