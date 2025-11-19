@@ -1153,7 +1153,6 @@ const Messages = () => {
                 </div>
                 <div>
                   <h2 className="font-semibold text-gray-900">{activeChat.username}</h2>
-                  <p className="text-sm text-gray-500">Active now</p>
                 </div>
               </div>
             </div>
