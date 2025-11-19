@@ -868,7 +868,7 @@ const Home = () => {
               <p className="text-gray-600 mb-4">The creators you follow haven't posted anything yet. Check back later!</p>
               <div className="flex justify-center space-x-4">
                 <button
-                  onClick={() => navigate('/explore')}
+                  onClick={() => navigate('/search')}
                   className="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
                 >
                   Find More Creators
