@@ -502,6 +502,25 @@ const Messages = () => {
 
       console.log('✅ Message sent:', data);
 
+      // Add message to local state immediately (optimistic update)
+      const newMessageObj = {
+        id: data.id,
+        sender_address: data.sender_address,
+        content: data.content,
+        has_media: false,
+        media_url: null,
+        media_type: null,
+        is_paid: false,
+        price: 0,
+        is_unlocked: true,
+        created_at: data.created_at,
+        timestamp: new Date(data.created_at).getTime(),
+        isOwn: true
+      };
+
+      // Add to messages state immediately
+      setMessages(prev => [...prev, newMessageObj]);
+
       // Clear form
       setNewMessage('');
 
@@ -515,11 +534,6 @@ const Messages = () => {
             }
           : conv
       ));
-
-      // Reload messages
-      await loadMessages(activeChat.address);
-
-      toast.success('Message sent!');
 
     } catch (error) {
       console.error('❌ Error sending message:', error);
