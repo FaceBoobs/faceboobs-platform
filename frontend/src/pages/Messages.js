@@ -1184,11 +1184,19 @@ const Messages = () => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
-              {messages.map((message) => {
+            <div className="flex-1 overflow-y-auto p-4 bg-pink-50">
+              {console.log('💬 Total messages to render:', messages.length)}
+              {messages.map((message, index) => {
                 const senderLower = message.sender_address?.toLowerCase();
                 const accountLower = account?.toLowerCase();
                 const isSent = message.isOwn === true || senderLower === accountLower;
+
+                console.log(`📨 Rendering message ${index + 1}:`, {
+                  content: message.content,
+                  sender: senderLower,
+                  isSent,
+                  hasContent: !!message.content
+                });
 
                 return (
                 <div
@@ -1196,8 +1204,17 @@ const Messages = () => {
                   className={isSent ? "flex justify-end mb-3" : "flex justify-start mb-3"}
                 >
                   <div
-                    className={`bg-pink-500 text-white rounded-2xl p-3 max-w-[70%] shadow-md ${isSent ? 'ml-auto' : 'mr-auto'}`}
+                    style={{
+                      backgroundColor: '#ec4899',
+                      color: '#ffffff',
+                      padding: '12px 16px',
+                      borderRadius: '16px',
+                      maxWidth: '75%',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}
+                    className="bg-pink-500 !bg-pink-500 text-white !text-white rounded-2xl shadow-md"
                   >
+
                     {/* Media Content */}
                     {message.has_media && message.media_url && (
                       <div className="mb-2">
@@ -1246,10 +1263,12 @@ const Messages = () => {
                     )}
 
                     {/* Text content - always show */}
-                    <p className="text-sm break-words">{message.content || '[Empty message]'}</p>
+                    <p style={{color: '#ffffff', fontSize: '14px'}} className="text-white !text-white text-sm break-words">
+                      {message.content || '[Empty message]'}
+                    </p>
 
                     {/* Timestamp */}
-                    <span className="text-xs block mt-1 text-pink-200">
+                    <span style={{color: '#ffffff', opacity: 0.7, fontSize: '12px'}} className="text-white !text-white text-xs block mt-1">
                       {formatMessageTime(message.timestamp)}
                     </span>
                   </div>
