@@ -44,35 +44,6 @@ const NotificationDropdown = ({ iconSize = 20, className = "" }) => {
     }
   };
 
-  const handleNotificationClick = (notification) => {
-    console.log('🔔 Notification clicked:', notification);
-
-    // Mark as read if not already read
-    if (!notification.is_read) {
-      markAsRead(notification.id);
-    }
-
-    // Close dropdown
-    setIsOpen(false);
-
-    // Navigate based on notification type
-    if (notification.post_id && notification.from_user_address) {
-      console.log('📬 Navigating to creator profile with post:', notification.post_id);
-      // For post-related notifications (like, comment, purchase), go to creator's profile
-      navigate(`/profile/${notification.from_user_address}`, {
-        state: { scrollToPostId: notification.post_id }
-      });
-    } else if (notification.type === 'follow' && notification.from_user_address) {
-      console.log('👤 Navigating to profile:', notification.from_user_address);
-      // Navigate to the user's profile
-      navigate(`/profile/${notification.from_user_address}`);
-    } else {
-      console.log('🏠 Navigating to home (no specific target)');
-      // Default: navigate to home
-      navigate('/');
-    }
-  };
-
   const handleMarkAllRead = () => {
     markAllAsRead();
   };
@@ -127,7 +98,7 @@ const NotificationDropdown = ({ iconSize = 20, className = "" }) => {
                 {recentNotifications.map((notification) => {
                   const username = notification.from_username || 'Unknown User';
                   const avatarUrl = notification.from_avatar_url;
-                  const postThumbnail = notification.post_media_url;
+                  const postThumbnail = notification.post?.media_url;
 
                   return (
                     <div
