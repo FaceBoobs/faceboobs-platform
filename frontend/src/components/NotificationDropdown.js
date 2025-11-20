@@ -127,16 +127,16 @@ const NotificationDropdown = ({ iconSize = 20, className = "" }) => {
                 {recentNotifications.map((notification) => {
                   const username = notification.from_username || 'Unknown User';
                   const avatarUrl = notification.from_avatar_url;
+                  const postThumbnail = notification.post_media_url;
 
                   return (
                     <div
                       key={notification.id}
-                      onClick={() => handleNotificationClick(notification)}
-                      className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                      className={`p-4 ${
                         !notification.is_read ? 'bg-blue-50' : ''
                       }`}
                     >
-                      <div className="flex items-start space-x-3">
+                      <div className="flex items-start space-x-3 justify-between">
                         {/* User Avatar */}
                         <div className="flex-shrink-0 relative">
                           <div className="w-10 h-10 bg-gradient-to-r from-pink-400 to-white rounded-full flex items-center justify-center overflow-hidden">
@@ -181,6 +181,20 @@ const NotificationDropdown = ({ iconSize = 20, className = "" }) => {
                             {formatTimestamp(notification.created_at)}
                           </p>
                         </div>
+
+                        {/* Post Thumbnail - only for post-related notifications */}
+                        {postThumbnail && (
+                          <div className="flex-shrink-0 ml-3">
+                            <img
+                              src={getMediaUrl(postThumbnail)}
+                              alt="Post preview"
+                              className="w-12 h-12 rounded-lg object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

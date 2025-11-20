@@ -399,13 +399,25 @@ export class SupabaseService {
     try {
       const { data, error } = await supabase
         .from('notifications')
-        .select('*')
+        .select(`
+          *,
+          posts!notifications_post_id_fkey (
+            media_url
+          )
+        `)
         .eq('user_address', userAddress)
         .order('created_at', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
-      return { success: true, data };
+
+      // Flatten the post data
+      const formattedData = data?.map(notification => ({
+        ...notification,
+        post_media_url: notification.posts?.media_url || null
+      })) || [];
+
+      return { success: true, data: formattedData };
     } catch (error) {
       console.error('Error fetching notifications:', error);
       return { success: false, error: error.message };
