@@ -1,26 +1,34 @@
 // src/pages/PostDetail.js
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader } from 'lucide-react';
+import { ArrowLeft, Loader, MessageCircle, Lock, User } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useLikes } from '../contexts/LikesContext';
 import { useComments } from '../contexts/CommentsContext';
 import { useToast } from '../contexts/ToastContext';
 import { SupabaseService } from '../services/supabaseService';
-import PostDetailModal from '../components/PostDetailModal';
+import LikeButton from '../components/LikeButton';
+import CommentButton from '../components/CommentButton';
+import ShareButton from '../components/ShareButton';
+import { ethers } from 'ethers';
 
 const PostDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { account, getMediaUrl } = useWeb3();
+  const { account, user, getMediaUrl, contract } = useWeb3();
   const { initializeLikes } = useLikes();
-  const { initializeComments } = useComments();
+  const { initializeComments, getComments, addComment } = useComments();
   const { toast } = useToast();
 
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showPostDetail, setShowPostDetail] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+
+  const postComments = post ? getComments(post.id.toString()) : [];
 
   useEffect(() => {
     loadPost();
@@ -49,6 +57,14 @@ const PostDetail = () => {
       await initializeLikes(id);
       await initializeComments(id);
 
+      // Check access if it's a paid post
+      if (postData.is_paid && account) {
+        const accessResult = await SupabaseService.checkContentAccess(account, id);
+        setHasAccess(accessResult.success ? accessResult.hasAccess : false);
+      } else {
+        setHasAccess(true); // Free posts are always accessible
+      }
+
       setPost(postData);
     } catch (err) {
       console.error('❌ Error loading post:', err);
@@ -59,13 +75,89 @@ const PostDetail = () => {
     }
   };
 
-  const handleClose = () => {
-    navigate(-1); // Go back to previous page
+  const handlePurchase = async () => {
+    if (!contract || !account || !post) {
+      toast.error('Please connect your wallet first.');
+      return;
+    }
+
+    if (!post.blockchain_content_id) {
+      toast.error('This post is not registered on blockchain. Cannot purchase.');
+      return;
+    }
+
+    try {
+      setPurchasing(true);
+
+      const priceInWei = ethers.parseEther(post.price.toString());
+      toast.info('🔐 Opening MetaMask for transaction confirmation...');
+
+      const tx = await contract.buyContent(post.blockchain_content_id, {
+        value: priceInWei,
+        gasLimit: 300000
+      });
+
+      console.log('⏳ Transaction sent:', tx.hash);
+      toast.info('⏳ Transaction sent! Waiting for confirmation...');
+
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt);
+
+      const purchaseData = {
+        user_address: account.toLowerCase(),
+        post_id: parseInt(post.id),
+        amount: post.price.toString(),
+        transaction_hash: receipt.hash,
+        created_at: new Date().toISOString()
+      };
+
+      await SupabaseService.createPurchase(purchaseData);
+
+      toast.success('🎉 Content purchased successfully!');
+      setHasAccess(true);
+    } catch (err) {
+      console.error('❌ Purchase error:', err);
+      toast.error('Purchase failed. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const handleSubmitComment = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim() || !post || !user) return;
+
+    try {
+      setSubmittingComment(true);
+
+      const result = await addComment(
+        post.id.toString(),
+        newComment.trim(),
+        user.wallet_address,
+        user.username,
+        user.avatar_url
+      );
+
+      if (result.success) {
+        setNewComment('');
+        toast.success('Comment added!');
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast.error('Failed to add comment. Please try again.');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const formatTimestamp = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
           <Loader className="w-8 h-8 animate-spin mx-auto text-purple-500" />
           <p className="mt-4 text-gray-600">Loading post...</p>
@@ -76,13 +168,13 @@ const PostDetail = () => {
 
   if (error || !post) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
           <div className="text-6xl mb-4">😕</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Post Not Found</h2>
           <p className="text-gray-600 mb-6">{error || 'The post you are looking for does not exist.'}</p>
           <button
-            onClick={handleClose}
+            onClick={() => navigate(-1)}
             className="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 transition-colors flex items-center gap-2 mx-auto"
           >
             <ArrowLeft size={20} />
@@ -97,25 +189,217 @@ const PostDetail = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header with back button */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center">
           <button
-            onClick={handleClose}
+            onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
-            <ArrowLeft size={20} />
-            <span className="font-medium">Back</span>
+            <ArrowLeft size={24} />
           </button>
+          <h1 className="ml-4 text-lg font-semibold text-gray-900">Post</h1>
         </div>
       </div>
 
-      {/* Post Detail Modal */}
-      {showPostDetail && post && (
-        <PostDetailModal
-          post={post}
-          onClose={handleClose}
-          getMediaUrl={getMediaUrl}
-        />
-      )}
+      {/* Post Content - Instagram style */}
+      <div className="max-w-2xl mx-auto py-4">
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+          {/* Post Header */}
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full flex items-center justify-center overflow-hidden">
+                {post.avatar_url && getMediaUrl(post.avatar_url) ? (
+                  <img
+                    src={getMediaUrl(post.avatar_url)}
+                    alt={post.username}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextElementSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <User className="h-6 w-6 text-white" style={post.avatar_url && getMediaUrl(post.avatar_url) ? { display: 'none' } : {}} />
+              </div>
+              <div className="ml-3">
+                <h3
+                  className="font-semibold text-gray-900 cursor-pointer hover:underline"
+                  onClick={() => navigate(`/profile/${post.creator_address}`)}
+                >
+                  {post.username || 'Anonymous'}
+                </h3>
+                <p className="text-sm text-gray-500">{formatTimestamp(post.created_at)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Post Image/Content */}
+          <div className="relative">
+            {post.is_paid && !hasAccess ? (
+              <div className="p-12 text-center bg-gray-50">
+                <Lock className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Premium Content</h3>
+                <p className="text-gray-600 mb-6">
+                  This content requires payment to view
+                </p>
+                <div className="flex flex-col items-center space-y-4">
+                  <span className="text-3xl font-bold text-purple-600">
+                    {post.price} BNB
+                  </span>
+                  <button
+                    onClick={handlePurchase}
+                    disabled={purchasing}
+                    className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 font-semibold"
+                  >
+                    {purchasing ? 'Processing...' : 'Purchase Access'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-100 flex items-center justify-center">
+                {post.media_url ? (
+                  post.type === 'video' ? (
+                    <video
+                      src={getMediaUrl(post.media_url)}
+                      controls
+                      className="w-full max-h-[600px] object-contain"
+                      onError={(e) => {
+                        console.error('Video load error');
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={getMediaUrl(post.media_url)}
+                      alt="Post content"
+                      className="w-full max-h-[600px] object-contain"
+                      onError={(e) => {
+                        console.error('Image load error');
+                      }}
+                    />
+                  )
+                ) : (
+                  <div className="w-full h-48 flex items-center justify-center">
+                    <p className="text-gray-500">No media available</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex space-x-4">
+                <LikeButton contentId={post.id.toString()} />
+                <CommentButton
+                  contentId={post.id.toString()}
+                  contentAuthor={post.username || 'Anonymous'}
+                />
+                <ShareButton
+                  contentId={post.id.toString()}
+                  contentAuthor={post.username || 'Anonymous'}
+                  contentDescription={post.caption || 'Check out this post!'}
+                  showLabel={true}
+                />
+              </div>
+            </div>
+
+            {/* Caption */}
+            {post.caption && (
+              <div className="mt-2">
+                <p className="text-gray-800">
+                  <span className="font-semibold mr-2">{post.username}</span>
+                  {post.caption}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Comments Section */}
+          <div className="p-4">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+              <MessageCircle size={20} className="mr-2" />
+              Comments ({postComments.length})
+            </h3>
+
+            {/* Comments List */}
+            <div className="space-y-4 mb-4 max-h-96 overflow-y-auto">
+              {postComments.length > 0 ? (
+                postComments.map((comment) => (
+                  <div key={comment.id} className="flex items-start space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
+                      {comment.avatar ? (
+                        <img
+                          src={getMediaUrl(comment.avatar)}
+                          alt={comment.username}
+                          className="w-full h-full object-cover rounded-full"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span className="text-white text-xs font-semibold">
+                          {comment.username?.charAt(0).toUpperCase() || 'U'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold text-sm text-gray-900">
+                          {comment.username || 'Anonymous'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(comment.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-gray-700 text-sm">{comment.content}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 text-center py-8">No comments yet. Be the first to comment!</p>
+              )}
+            </div>
+
+            {/* Add Comment Form */}
+            {user ? (
+              <form onSubmit={handleSubmitComment} className="flex items-center space-x-3 border-t border-gray-200 pt-4">
+                <div className="w-8 h-8 bg-gradient-to-r from-pink-400 to-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
+                  {user.avatar_url && getMediaUrl(user.avatar_url) ? (
+                    <img
+                      src={getMediaUrl(user.avatar_url)}
+                      alt={user.username}
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  ) : (
+                    <span className="text-white text-xs font-semibold">
+                      {user.username?.charAt(0).toUpperCase() || 'U'}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  disabled={submittingComment}
+                />
+                <button
+                  type="submit"
+                  disabled={!newComment.trim() || submittingComment}
+                  className="bg-purple-500 text-white px-6 py-2 rounded-full hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                >
+                  {submittingComment ? 'Posting...' : 'Post'}
+                </button>
+              </form>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <p>Please log in to comment</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
