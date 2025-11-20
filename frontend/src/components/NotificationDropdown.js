@@ -48,6 +48,25 @@ const NotificationDropdown = ({ iconSize = 20, className = "" }) => {
     markAllAsRead();
   };
 
+  const handleNotificationClick = (notification) => {
+    // Mark as read if not already
+    if (!notification.is_read) {
+      markAsRead(notification.id);
+    }
+
+    // Close dropdown
+    setIsOpen(false);
+
+    // Navigate based on notification type
+    if (notification.post_id) {
+      // Navigate to post detail page
+      navigate('/post/' + notification.post_id);
+    } else if (notification.type === 'follow' && notification.from_user_address) {
+      // Navigate to user profile for follow notifications
+      navigate('/profile/' + notification.from_user_address);
+    }
+  };
+
   // Recent notifications (last 5)
   const recentNotifications = notifications.slice(0, 5);
 
@@ -103,7 +122,8 @@ const NotificationDropdown = ({ iconSize = 20, className = "" }) => {
                   return (
                     <div
                       key={notification.id}
-                      className={`p-4 ${
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
                         !notification.is_read ? 'bg-blue-50' : ''
                       }`}
                     >
