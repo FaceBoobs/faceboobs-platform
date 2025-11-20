@@ -544,8 +544,7 @@ const Profile = () => {
                     <div
                       className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer relative"
                       onClick={() => {
-                        setSelectedPost(content);
-                        setShowPostDetail(true);
+                        navigate(`/post/${content.id}`);
                       }}
                     >
                       {/* Always show image, apply blur if locked */}
