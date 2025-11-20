@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, MessageCircle, Share, Lock, Eye, User, Trash2, MoreHorizontal } from 'lucide-react';
 import { ethers } from 'ethers';
+import { useNavigate } from 'react-router-dom';
 import LikeButton from './LikeButton';
 import CommentButton from './CommentButton';
 import ShareButton from './ShareButton';
@@ -10,6 +11,7 @@ import { useToast } from '../contexts/ToastContext';
 const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) => {
   const { user: currentUser, getMediaUrl } = useWeb3();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
@@ -51,6 +53,20 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
     setShowMenu(false);
   };
 
+  const handleProfileClick = (e) => {
+    e.stopPropagation();
+    if (content.creator) {
+      navigate(`/profile/${content.creator}`);
+    }
+  };
+
+  const handleImageClick = (e) => {
+    e.stopPropagation();
+    if (content.id) {
+      navigate(`/post/${content.id}`);
+    }
+  };
+
   // Check if current user is the owner of this post
   const isOwnPost = currentUser && content.creator === currentUser.address;
 
@@ -60,11 +76,17 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
       <div className="p-3 border-b border-gray-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+            <div
+              onClick={handleProfileClick}
+              className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
+            >
               <User className="h-6 w-6 text-white" />
             </div>
             <div className="ml-3">
-              <h3 className="font-semibold text-gray-900">
+              <h3
+                onClick={handleProfileClick}
+                className="font-semibold text-gray-900 cursor-pointer hover:underline"
+              >
                 {content.creatorData?.username || 'Anonymous'}
               </h3>
               <p className="text-sm text-gray-500">{formatTimestamp(content.timestamp)}</p>
@@ -138,7 +160,8 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
                   <img
                     src={displayUrl}
                     alt="Content"
-                    className="w-full h-auto object-contain max-h-[900px]"
+                    onClick={handleImageClick}
+                    className="w-full h-auto object-contain max-h-[900px] cursor-pointer hover:opacity-95 transition-opacity"
                     onError={(e) => {
                       e.target.style.display = 'none';
                       e.target.nextSibling.style.display = 'flex';
