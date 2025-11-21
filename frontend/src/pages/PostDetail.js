@@ -55,8 +55,7 @@ const PostDetail = () => {
       console.log('📊 Post media fields:', {
         media_url: postData.media_url,
         image_url: postData.image_url,
-        content_hash: postData.content_hash,
-        type: postData.type
+        content_hash: postData.content_hash
       });
 
       // Initialize likes and comments for this post
@@ -270,7 +269,6 @@ const PostDetail = () => {
                     media_url: post.media_url,
                     image_url: post.image_url,
                     mediaUrl,
-                    type: post.type,
                     hasMedia: !!mediaUrl
                   });
 
@@ -303,12 +301,9 @@ const PostDetail = () => {
                     );
                   }
 
-                  // Infer type if undefined: check if URL contains 'video'
-                  let mediaType = post.type;
-                  if (!mediaType) {
-                    mediaType = (mediaUrl.toLowerCase().includes('video') || mediaSrc.startsWith('data:video')) ? 'video' : 'image';
-                    console.log('🔍 Type inferred:', mediaType);
-                  }
+                  // Infer type from media URL: check if URL contains 'video'
+                  const mediaType = (mediaUrl.toLowerCase().includes('video') || mediaSrc.startsWith('data:video')) ? 'video' : 'image';
+                  console.log('🔍 Type inferred:', mediaType);
 
                   return mediaType === 'video' ? (
                     <video
