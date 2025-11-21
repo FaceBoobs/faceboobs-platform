@@ -586,6 +586,12 @@ export const Web3Provider = ({ children }) => {
       return null;
     }
 
+    // REJECT base64 data URLs - media must be stored as Supabase Storage URLs
+    if (fileId.startsWith('data:image') || fileId.startsWith('data:video') || fileId.startsWith('data:audio')) {
+      console.error('❌ [getMediaUrl] Base64 data URL detected - rejecting. Media must use Supabase Storage URL:', fileId.substring(0, 50));
+      return null;
+    }
+
     // If fileId is already a direct URL (e.g., Supabase Storage URL), return it directly
     if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
       console.log('🌐 [getMediaUrl] Direct URL detected:', fileId.substring(0, 50) + '...');

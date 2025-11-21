@@ -280,8 +280,30 @@ const PostDetail = () => {
                     );
                   }
 
+                  // VALIDATION: Reject base64 encoded media URLs
+                  // Media URL must be a Supabase Storage URL, not base64
+                  if (mediaUrl.startsWith('data:image') || mediaUrl.startsWith('data:video')) {
+                    console.error('❌ Invalid media format: Base64 detected instead of Storage URL');
+                    return (
+                      <div className="w-full h-48 flex items-center justify-center bg-red-50">
+                        <div className="text-center p-4">
+                          <p className="text-red-600 font-semibold mb-2">Invalid media format</p>
+                          <p className="text-gray-600 text-sm">Media must be stored as Supabase Storage URL</p>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const mediaSrc = getMediaUrl(mediaUrl);
                   console.log('🔗 Media source:', mediaSrc);
+
+                  if (!mediaSrc) {
+                    return (
+                      <div className="w-full h-48 flex items-center justify-center">
+                        <p className="text-gray-500">Media not found</p>
+                      </div>
+                    );
+                  }
 
                   return post.type === 'video' ? (
                     <video
