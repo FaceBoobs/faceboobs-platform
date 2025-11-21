@@ -188,7 +188,7 @@ const Home = () => {
           address: post.creator_address,
           isCreator: true
         },
-        content: post.image_url, // base64 image data from image_url field
+        content: post.media_url || post.image_url, // media_url first, fallback to image_url
         description: post.description || '',
         isPaid: post.is_paid || false,
         price: post.price ? post.price.toString() : '0',
@@ -263,7 +263,7 @@ const Home = () => {
           address: story.creator_address,
           isCreator: true
         },
-        content: story.image_url, // base64 image data from image_url field
+        content: story.media_url || story.image_url, // media_url first, fallback to image_url
         timestamp: Math.floor(new Date(story.created_at).getTime() / 1000),
         expiryTime: Math.floor(new Date(story.expires_at).getTime() / 1000)
       }));

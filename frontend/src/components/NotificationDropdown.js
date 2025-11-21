@@ -117,7 +117,8 @@ const NotificationDropdown = ({ iconSize = 20, className = "" }) => {
                 {recentNotifications.map((notification) => {
                   const username = notification.from_username || 'Unknown User';
                   const avatarUrl = notification.from_avatar_url;
-                  const postThumbnail = notification.post?.media_url;
+                  // Use media_url first, fallback to image_url
+                  const postThumbnail = notification.post?.media_url || notification.post?.image_url;
 
                   return (
                     <div

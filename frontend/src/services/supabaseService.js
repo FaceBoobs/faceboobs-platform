@@ -451,7 +451,7 @@ export class SupabaseService {
       if (postIds.length > 0) {
         const { data: posts, error: postsError } = await supabase
           .from('posts')
-          .select('id, media_url, type')
+          .select('id, media_url, image_url, type')
           .in('id', postIds);
 
         if (!postsError && posts) {

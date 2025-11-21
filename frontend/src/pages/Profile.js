@@ -246,7 +246,7 @@ const Profile = () => {
               address: post.creator_address,
               isCreator: true
             },
-            content: post.image_url, // Image data from image_url field
+            content: post.media_url || post.image_url, // media_url first, fallback to image_url
             contentHash: post.content_hash,
             description: post.description || '',
             isPaid: post.is_paid || false,
