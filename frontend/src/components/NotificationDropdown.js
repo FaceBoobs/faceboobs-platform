@@ -49,33 +49,22 @@ const NotificationDropdown = ({ iconSize = 20, className = "" }) => {
   };
 
   const handleNotificationClick = (e, notification) => {
-    // Stop event propagation to prevent parent handlers from triggering
     e.stopPropagation();
 
-    console.log('🔔 Notification clicked:', {
-      id: notification.id,
-      type: notification.type,
-      post_id: notification.post_id,
-      from_user_address: notification.from_user_address
-    });
+    console.log('🔔 Notification clicked:', notification);
 
     // Mark as read if not already
     if (!notification.is_read) {
       markAsRead(notification.id);
     }
 
-    // Close dropdown
-    setIsOpen(false);
-
     // Navigate based on notification type
     if (notification.post_id) {
-      // Navigate to post detail page
-      console.log('📍 Navigating to post:', notification.post_id);
       navigate('/post/' + notification.post_id);
+      setIsOpen(false);
     } else if (notification.type === 'follow' && notification.from_user_address) {
-      // Navigate to user profile for follow notifications
-      console.log('📍 Navigating to profile:', notification.from_user_address);
       navigate('/profile/' + notification.from_user_address);
+      setIsOpen(false);
     }
   };
 
