@@ -429,14 +429,28 @@ export class SupabaseService {
       // Step 2: Get unique user addresses and post IDs
       const actorAddresses = [...new Set(notifications.map(n => n.from_user_address).filter(Boolean))];
 
-      // Filter and clean post IDs: only valid numeric IDs
-      const postIds = [...new Set(
-        notifications
-          .map(n => n.post_id)
-          .filter(id => id != null && id !== undefined && typeof id === 'number' && !isNaN(id))
-      )];
+      // Filter and clean post IDs: RIGOROUS validation for only valid integer IDs
+      const postIds = notifications.map(n => n.post_id).filter(id => {
+        return id != null && id !== undefined && typeof id === 'number' && Number.isInteger(id) && id > 0;
+      });
 
-      console.log('🔍 [getNotifications] PostIds to fetch:', postIds);
+      // Remove duplicates
+      const uniquePostIds = [...new Set(postIds)];
+
+      // Check if there are any valid post IDs before querying
+      if (uniquePostIds.length === 0) {
+        console.log('⚠️ No valid post IDs');
+        // Return notifications with empty postsMap
+        const enrichedNotifications = notifications.map(notification => ({
+          ...notification,
+          from_username: 'Unknown User',
+          from_avatar_url: null,
+          post: null
+        }));
+        return { success: true, data: enrichedNotifications };
+      }
+
+      console.log('✅ Valid PostIds:', uniquePostIds);
 
       // Step 3: Fetch users data
       let usersMap = {};
@@ -456,16 +470,16 @@ export class SupabaseService {
 
       // Step 4: Fetch posts data
       let postsMap = {};
-      if (postIds.length > 0) {
-        console.log('📡 [getNotifications] Fetching posts with IDs:', postIds);
+      if (uniquePostIds.length > 0) {
+        console.log('📡 [getNotifications] Fetching posts with IDs:', uniquePostIds);
         const { data: posts, error: postsError } = await supabase
           .from('posts')
           .select('id, media_url, image_url, type')
-          .in('id', postIds);
+          .in('id', uniquePostIds);
 
         if (postsError) {
           console.error('❌ [getNotifications] Error fetching posts:', postsError);
-          console.error('❌ [getNotifications] PostIds that caused error:', postIds);
+          console.error('❌ [getNotifications] PostIds that caused error:', uniquePostIds);
         }
 
         if (!postsError && posts) {
