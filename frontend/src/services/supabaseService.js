@@ -428,7 +428,15 @@ export class SupabaseService {
 
       // Step 2: Get unique user addresses and post IDs
       const actorAddresses = [...new Set(notifications.map(n => n.from_user_address).filter(Boolean))];
-      const postIds = [...new Set(notifications.map(n => n.post_id).filter(Boolean))];
+
+      // Filter and clean post IDs: only valid numeric IDs
+      const postIds = [...new Set(
+        notifications
+          .map(n => n.post_id)
+          .filter(id => id != null && id !== undefined && typeof id === 'number' && !isNaN(id))
+      )];
+
+      console.log('🔍 [getNotifications] PostIds to fetch:', postIds);
 
       // Step 3: Fetch users data
       let usersMap = {};
@@ -449,17 +457,26 @@ export class SupabaseService {
       // Step 4: Fetch posts data
       let postsMap = {};
       if (postIds.length > 0) {
+        console.log('📡 [getNotifications] Fetching posts with IDs:', postIds);
         const { data: posts, error: postsError } = await supabase
           .from('posts')
           .select('id, media_url, image_url, type')
           .in('id', postIds);
 
+        if (postsError) {
+          console.error('❌ [getNotifications] Error fetching posts:', postsError);
+          console.error('❌ [getNotifications] PostIds that caused error:', postIds);
+        }
+
         if (!postsError && posts) {
+          console.log('✅ [getNotifications] Fetched posts:', posts.length);
           postsMap = posts.reduce((acc, post) => {
             acc[post.id] = post;
             return acc;
           }, {});
         }
+      } else {
+        console.log('ℹ️ [getNotifications] No post IDs to fetch');
       }
 
       // Step 5: Enrich notifications with user and post data
