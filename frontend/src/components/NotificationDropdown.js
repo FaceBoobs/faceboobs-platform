@@ -52,10 +52,19 @@ const NotificationDropdown = ({ iconSize = 20, className = "" }) => {
     e.stopPropagation();
 
     console.log('🔔 Notification clicked:', notification);
+    console.log('🔍 Post ID:', notification.post_id, 'Type:', typeof notification.post_id);
+    console.log('🔍 Notification type:', notification.type);
+    console.log('🔍 From user:', notification.from_user_address);
 
     // Mark as read if not already
     if (!notification.is_read) {
       markAsRead(notification.id);
+    }
+
+    // Check if post_id exists
+    if (!notification.post_id) {
+      console.log('❌ No post_id found!');
+      return;
     }
 
     // Navigate based on notification type
