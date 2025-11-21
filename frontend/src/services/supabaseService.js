@@ -40,16 +40,31 @@ export class SupabaseService {
     try {
       console.log('🔍 Fetching single post:', postId);
 
+      // Step 1: Fetch the post
       const { data, error } = await supabase
         .from('posts')
         .select('*')
         .eq('id', postId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
       if (!data) {
         return { success: false, error: 'Post not found' };
+      }
+
+      // Step 2: Fetch user data if creator_address exists
+      if (data.creator_address) {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('username, avatar_url, wallet_address')
+          .eq('wallet_address', data.creator_address)
+          .maybeSingle();
+
+        if (!userError && userData) {
+          data.username = userData.username;
+          data.avatar_url = userData.avatar_url;
+        }
       }
 
       return { success: true, data };
@@ -185,13 +200,13 @@ export class SupabaseService {
       // Get list of users the current user follows
       const { data: followingData, error: followingError } = await supabase
         .from('follows')
-        .select('following_address')
+        .select('followed_address')
         .eq('follower_address', userAddress);
 
       if (followingError) throw followingError;
 
       // Extract addresses of followed users
-      const followingAddresses = followingData?.map(f => f.following_address) || [];
+      const followingAddresses = followingData?.map(f => f.followed_address) || [];
 
       // If not following anyone, return empty array
       if (followingAddresses.length === 0) {
@@ -397,19 +412,65 @@ export class SupabaseService {
 
   static async getNotifications(userAddress, limit = 50) {
     try {
-      const { data, error } = await supabase
+      // Step 1: Fetch notifications
+      const { data: notifications, error } = await supabase
         .from('notifications')
-        .select(`
-          *,
-          user:users(*),
-          post:posts(id, media_url, type)
-        `)
+        .select('*')
         .eq('user_address', userAddress)
         .order('created_at', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
-      return { success: true, data: data || [] };
+
+      if (!notifications || notifications.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      // Step 2: Get unique user addresses and post IDs
+      const actorAddresses = [...new Set(notifications.map(n => n.from_user_address).filter(Boolean))];
+      const postIds = [...new Set(notifications.map(n => n.post_id).filter(Boolean))];
+
+      // Step 3: Fetch users data
+      let usersMap = {};
+      if (actorAddresses.length > 0) {
+        const { data: users, error: usersError } = await supabase
+          .from('users')
+          .select('wallet_address, username, avatar_url')
+          .in('wallet_address', actorAddresses);
+
+        if (!usersError && users) {
+          usersMap = users.reduce((acc, user) => {
+            acc[user.wallet_address] = user;
+            return acc;
+          }, {});
+        }
+      }
+
+      // Step 4: Fetch posts data
+      let postsMap = {};
+      if (postIds.length > 0) {
+        const { data: posts, error: postsError } = await supabase
+          .from('posts')
+          .select('id, media_url, type')
+          .in('id', postIds);
+
+        if (!postsError && posts) {
+          postsMap = posts.reduce((acc, post) => {
+            acc[post.id] = post;
+            return acc;
+          }, {});
+        }
+      }
+
+      // Step 5: Enrich notifications with user and post data
+      const enrichedNotifications = notifications.map(notification => ({
+        ...notification,
+        from_username: usersMap[notification.from_user_address]?.username || 'Unknown User',
+        from_avatar_url: usersMap[notification.from_user_address]?.avatar_url || null,
+        post: notification.post_id ? postsMap[notification.post_id] : null
+      }));
+
+      return { success: true, data: enrichedNotifications };
     } catch (error) {
       console.error('Error fetching notifications:', error);
       return { success: false, error: error.message };

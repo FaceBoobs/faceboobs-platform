@@ -52,6 +52,12 @@ const PostDetail = () => {
 
       const postData = result.data;
       console.log('✅ Post loaded:', postData);
+      console.log('📊 Post media fields:', {
+        media_url: postData.media_url,
+        image_url: postData.image_url,
+        content_hash: postData.content_hash,
+        type: postData.type
+      });
 
       // Initialize likes and comments for this post
       await initializeLikes(id);
@@ -256,31 +262,47 @@ const PostDetail = () => {
               </div>
             ) : (
               <div className="bg-gray-100 flex items-center justify-center">
-                {post.media_url ? (
-                  post.type === 'video' ? (
+                {(() => {
+                  // Get media URL - check multiple field names
+                  const mediaUrl = post.media_url || post.image_url || post.content_hash;
+
+                  console.log('🖼️ Rendering media:', {
+                    mediaUrl,
+                    type: post.type,
+                    hasMedia: !!mediaUrl
+                  });
+
+                  if (!mediaUrl) {
+                    return (
+                      <div className="w-full h-48 flex items-center justify-center">
+                        <p className="text-gray-500">No media available</p>
+                      </div>
+                    );
+                  }
+
+                  const mediaSrc = getMediaUrl(mediaUrl);
+                  console.log('🔗 Media source:', mediaSrc);
+
+                  return post.type === 'video' ? (
                     <video
-                      src={getMediaUrl(post.media_url)}
+                      src={mediaSrc}
                       controls
                       className="w-full max-h-[600px] object-contain"
                       onError={(e) => {
-                        console.error('Video load error');
+                        console.error('❌ Video load error:', e);
                       }}
                     />
                   ) : (
                     <img
-                      src={getMediaUrl(post.media_url)}
+                      src={mediaSrc}
                       alt="Post content"
                       className="w-full max-h-[600px] object-contain"
                       onError={(e) => {
-                        console.error('Image load error');
+                        console.error('❌ Image load error:', e);
                       }}
                     />
-                  )
-                ) : (
-                  <div className="w-full h-48 flex items-center justify-center">
-                    <p className="text-gray-500">No media available</p>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
           </div>
