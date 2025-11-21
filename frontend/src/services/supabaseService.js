@@ -476,7 +476,7 @@ export class SupabaseService {
         console.log('📡 [getNotifications] Fetching posts with IDs:', uniquePostIds);
         const { data: posts, error: postsError } = await supabase
           .from('posts')
-          .select('id, media_url, image_url, type')
+          .select('id, media_url, type')
           .in('id', uniquePostIds);
 
         if (postsError) {
