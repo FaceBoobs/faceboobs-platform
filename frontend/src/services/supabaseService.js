@@ -430,9 +430,10 @@ export class SupabaseService {
       const actorAddresses = [...new Set(notifications.map(n => n.from_user_address).filter(Boolean))];
 
       // Filter and clean post IDs: RIGOROUS validation for only valid integer IDs
-      const postIds = notifications.map(n => n.post_id).filter(id => {
-        return id != null && id !== undefined && typeof id === 'number' && Number.isInteger(id) && id > 0;
-      });
+      const postIds = notifications.map(n => {
+        const id = Number(n.post_id);
+        return (!isNaN(id) && Number.isInteger(id) && id > 0) ? id : null;
+      }).filter(id => id !== null);
 
       // Remove duplicates
       const uniquePostIds = [...new Set(postIds)];
@@ -451,6 +452,7 @@ export class SupabaseService {
       }
 
       console.log('✅ Valid PostIds:', uniquePostIds);
+      console.log('✅ Valid PostIds to fetch:', uniquePostIds, 'Types:', uniquePostIds.map(id => typeof id));
 
       // Step 3: Fetch users data
       let usersMap = {};
