@@ -14,6 +14,7 @@ import { CommentsProvider } from './contexts/CommentsContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import WalletConnection from './components/WalletConnection';
 import NetworkStatus from './components/NetworkStatus';
+import SupabaseConnectionBanner from './components/SupabaseConnectionBanner';
 
 // Components
 import Navbar from './components/Navbar';
@@ -169,7 +170,10 @@ function AppContent() {
     <ErrorBoundary>
       <Router>
         <div className="min-h-screen bg-gray-50">
-          <Navbar 
+          {/* Supabase Connection Status Banner */}
+          <SupabaseConnectionBanner />
+
+          <Navbar
             user={user}
             account={account}
             onConnect={connectWallet}
@@ -177,7 +181,7 @@ function AppContent() {
             onBecomeCreator={handleBecomeCreator}
             loading={loading}
           />
-          
+
           {!isCorrectNetwork && account && (
             <NetworkStatus />
           )}
