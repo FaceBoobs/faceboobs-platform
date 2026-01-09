@@ -7,9 +7,10 @@ import { useWeb3 } from '../contexts/Web3Context';
 const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
   const { getComments, addComment, initializeComments, formatTimestamp } = useComments();
   const { account, user } = useWeb3();
-  
+
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
   const modalRef = useRef(null);
   const textareaRef = useRef(null);
   const commentsEndRef = useRef(null);
@@ -18,9 +19,19 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
 
   // Initialize comments when modal opens
   useEffect(() => {
-    if (isOpen && contentId) {
-      initializeComments(contentId);
-    }
+    const loadComments = async () => {
+      if (isOpen && contentId) {
+        setIsLoadingComments(true);
+        try {
+          await initializeComments(contentId);
+        } catch (error) {
+          console.error('Error loading comments:', error);
+        } finally {
+          setIsLoadingComments(false);
+        }
+      }
+    };
+    loadComments();
   }, [isOpen, contentId, initializeComments]);
 
   // Auto-focus textarea when modal opens
@@ -86,10 +97,10 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div 
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 md:p-4">
+      <div
         ref={modalRef}
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col"
+        className="bg-white md:rounded-xl shadow-2xl w-full md:max-w-lg h-full md:h-auto md:max-h-[80vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -110,7 +121,20 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
 
         {/* Comments List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px] max-h-[400px]">
-          {comments.length === 0 ? (
+          {isLoadingComments ? (
+            // Loading Skeleton
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex space-x-3 animate-pulse">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                    <div className="h-16 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : comments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-gray-500">
               <MessageCircle size={48} className="text-gray-300 mb-4" />
               <p className="text-lg font-medium mb-2">No comments yet</p>

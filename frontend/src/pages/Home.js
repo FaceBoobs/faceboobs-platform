@@ -655,18 +655,10 @@ const Home = () => {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-4">
               <LikeButton contentId={content.id.toString()} />
-              <button
-                onClick={() => {
-                  setSelectedPost(content);
-                  setShowPostDetail(true);
-                }}
-                className="flex items-center space-x-1 text-gray-600 hover:text-blue-500 transition-colors"
-              >
-                <CommentButton
-                  contentId={content.id.toString()}
-                  contentAuthor={content.creatorData.username}
-                />
-              </button>
+              <CommentButton
+                contentId={content.id.toString()}
+                contentAuthor={content.creatorData.username}
+              />
               <ShareButton
                 contentId={content.id.toString()}
                 contentAuthor={content.creatorData.username}

@@ -1,13 +1,14 @@
 // src/components/CommentButton.js
 import React, { useState, useEffect } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Loader2 } from 'lucide-react';
 import { useComments } from '../contexts/CommentsContext';
 import CommentModal from './CommentModal';
 
 const CommentButton = ({ contentId, contentAuthor, className = "", size = 20 }) => {
   const { getCommentCount, initializeComments } = useComments();
   const [showModal, setShowModal] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(false);
+
   // Get current comment count
   const commentCount = getCommentCount(contentId);
 
@@ -18,10 +19,24 @@ const CommentButton = ({ contentId, contentAuthor, className = "", size = 20 }) 
     }
   }, [contentId, initializeComments]);
 
-  const handleClick = (e) => {
+  const handleClick = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setShowModal(true);
+
+    // Prevent multiple clicks while loading
+    if (isLoading) return;
+
+    setIsLoading(true);
+
+    // Ensure comments are loaded before opening modal
+    try {
+      await initializeComments(contentId);
+    } catch (error) {
+      console.error('Error loading comments:', error);
+    } finally {
+      setIsLoading(false);
+      setShowModal(true);
+    }
   };
 
   const handleCloseModal = () => {
@@ -32,9 +47,15 @@ const CommentButton = ({ contentId, contentAuthor, className = "", size = 20 }) 
     <>
       <button
         onClick={handleClick}
-        className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-all duration-200 text-gray-600 hover:text-blue-500 hover:bg-blue-50 ${className}`}
+        disabled={isLoading}
+        className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-all duration-200 text-gray-600 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        aria-label={`View ${commentCount} comments`}
       >
-        <MessageCircle size={size} />
+        {isLoading ? (
+          <Loader2 size={size} className="animate-spin" />
+        ) : (
+          <MessageCircle size={size} />
+        )}
         <span className="text-sm font-medium">
           {commentCount}
         </span>
