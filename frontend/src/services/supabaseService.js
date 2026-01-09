@@ -363,13 +363,27 @@ export class SupabaseService {
 
   static async getCommentsForPost(postId) {
     try {
+      console.log('🔍 Fetching comments for post:', postId);
+
       const { data, error } = await supabase
         .from('comments')
-        .select('*')
+        .select(`
+          id,
+          post_id,
+          user_address,
+          username,
+          comment_text,
+          avatar,
+          created_at
+        `)
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
+
+      console.log('📦 Fetched comments data:', data);
+      console.log('📊 Comment fields:', data.length > 0 ? Object.keys(data[0]) : 'No comments');
+
       return { success: true, data };
     } catch (error) {
       console.error('Error fetching comments:', error);

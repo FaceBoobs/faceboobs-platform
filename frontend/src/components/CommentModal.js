@@ -22,12 +22,26 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
     const loadComments = async () => {
       if (isOpen && contentId) {
         setIsLoadingComments(true);
+        setComments([]); // Reset comments when loading
         try {
-          console.log('📥 Fetching comments for post:', contentId);
+          console.log('📥 [CommentModal] Fetching comments for post:', contentId);
           const result = await SupabaseService.getCommentsForPost(contentId);
 
           if (result.success) {
-            console.log('✅ Loaded comments:', result.data);
+            console.log('✅ [CommentModal] Loaded comments:', result.data);
+            console.log('📊 [CommentModal] Number of comments:', result.data?.length);
+
+            // Debug each comment
+            result.data?.forEach((comment, index) => {
+              console.log(`💬 Comment ${index + 1}:`, {
+                id: comment.id,
+                username: comment.username,
+                comment_text: comment.comment_text,
+                has_text: !!comment.comment_text,
+                text_length: comment.comment_text?.length || 0
+              });
+            });
+
             setComments(result.data || []);
           } else {
             console.error('❌ Failed to load comments:', result.error);
@@ -117,15 +131,23 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
         avatar: user.profileImage || user.avatarHash || null
       };
 
-      console.log('📤 Creating comment:', commentData);
+      console.log('📤 [CommentModal] Creating comment:', commentData);
+      console.log('📝 [CommentModal] Comment text length:', commentData.comment_text.length);
       const result = await SupabaseService.createComment(commentData);
 
       if (result.success) {
-        console.log('✅ Comment created:', result.data);
+        console.log('✅ [CommentModal] Comment created successfully');
+        console.log('📦 [CommentModal] Returned data:', result.data);
+        console.log('💬 [CommentModal] Returned comment_text:', result.data?.comment_text);
+
         toast.success('Comment posted!');
 
         // Append new comment to the list
-        setComments(prevComments => [...prevComments, result.data]);
+        setComments(prevComments => {
+          const updated = [...prevComments, result.data];
+          console.log('📊 [CommentModal] Total comments after add:', updated.length);
+          return updated;
+        });
 
         // Clear the input
         setCommentText('');
@@ -133,11 +155,11 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
         // Keep focus on textarea for more comments
         textareaRef.current?.focus();
       } else {
-        console.error('❌ Failed to create comment:', result.error);
+        console.error('❌ [CommentModal] Failed to create comment:', result.error);
         toast.error('Failed to post comment: ' + result.error);
       }
     } catch (error) {
-      console.error('Error posting comment:', error);
+      console.error('❌ [CommentModal] Error posting comment:', error);
       toast.error('Error posting comment');
     } finally {
       setIsSubmitting(false);
@@ -230,9 +252,15 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
                         {formatTimestamp(comment.created_at)}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      {comment.comment_text}
-                    </p>
+                    {comment.comment_text ? (
+                      <p className="text-sm text-gray-700 leading-relaxed break-words">
+                        {comment.comment_text}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-red-500 italic">
+                        [Comment text missing - Debug: ID {comment.id}]
+                      </p>
+                    )}
                   </div>
 
                   {/* Comment actions - could add later */}
