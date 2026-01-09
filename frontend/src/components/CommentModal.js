@@ -1,13 +1,15 @@
 // src/components/CommentModal.js
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, MessageCircle, User } from 'lucide-react';
-import { useComments } from '../contexts/CommentsContext';
 import { useWeb3 } from '../contexts/Web3Context';
+import { SupabaseService } from '../services/supabaseService';
+import { useToast } from '../contexts/ToastContext';
 
 const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
-  const { getComments, addComment, initializeComments, formatTimestamp } = useComments();
   const { account, user } = useWeb3();
+  const { toast } = useToast();
 
+  const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
@@ -15,24 +17,34 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
   const textareaRef = useRef(null);
   const commentsEndRef = useRef(null);
 
-  const comments = getComments(contentId);
-
-  // Initialize comments when modal opens
+  // Fetch comments from Supabase when modal opens
   useEffect(() => {
     const loadComments = async () => {
       if (isOpen && contentId) {
         setIsLoadingComments(true);
         try {
-          await initializeComments(contentId);
+          console.log('📥 Fetching comments for post:', contentId);
+          const result = await SupabaseService.getCommentsForPost(contentId);
+
+          if (result.success) {
+            console.log('✅ Loaded comments:', result.data);
+            setComments(result.data || []);
+          } else {
+            console.error('❌ Failed to load comments:', result.error);
+            toast.error('Failed to load comments');
+            setComments([]);
+          }
         } catch (error) {
           console.error('Error loading comments:', error);
+          toast.error('Error loading comments');
+          setComments([]);
         } finally {
           setIsLoadingComments(false);
         }
       }
     };
     loadComments();
-  }, [isOpen, contentId, initializeComments]);
+  }, [isOpen, contentId, toast]);
 
   // Auto-focus textarea when modal opens
   useEffect(() => {
@@ -72,19 +84,64 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
     }
   }, [isOpen, onClose]);
 
+  // Format timestamp helper
+  const formatTimestamp = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    return date.toLocaleDateString();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!commentText.trim() || isSubmitting) return;
 
-    setIsSubmitting(true);
-    const result = await addComment(contentId, commentText, account, user?.username);
-    
-    if (result.success) {
-      setCommentText('');
-      // Keep focus on textarea for more comments
-      textareaRef.current?.focus();
+    if (!account || !user) {
+      toast.error('Please connect your wallet to comment');
+      return;
     }
-    setIsSubmitting(false);
+
+    setIsSubmitting(true);
+
+    try {
+      const commentData = {
+        post_id: parseInt(contentId),
+        user_address: account.toLowerCase(),
+        username: user.username || `User${account.substring(0, 6)}`,
+        comment_text: commentText.trim(),
+        avatar: user.profileImage || user.avatarHash || null
+      };
+
+      console.log('📤 Creating comment:', commentData);
+      const result = await SupabaseService.createComment(commentData);
+
+      if (result.success) {
+        console.log('✅ Comment created:', result.data);
+        toast.success('Comment posted!');
+
+        // Append new comment to the list
+        setComments(prevComments => [...prevComments, result.data]);
+
+        // Clear the input
+        setCommentText('');
+
+        // Keep focus on textarea for more comments
+        textareaRef.current?.focus();
+      } else {
+        console.error('❌ Failed to create comment:', result.error);
+        toast.error('Failed to post comment: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error posting comment:', error);
+      toast.error('Error posting comment');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -150,12 +207,14 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
                   {comment.avatar ? (
                     <img
                       src={comment.avatar}
-                      alt={comment.author}
+                      alt={comment.username || 'User'}
                       className="w-10 h-10 rounded-full object-cover"
                     />
                   ) : (
                     <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-white rounded-full flex items-center justify-center">
-                      <User size={20} className="text-pink-800" />
+                      <span className="text-pink-800 font-semibold text-sm">
+                        {(comment.username || 'U').charAt(0).toUpperCase()}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -165,17 +224,17 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
                   <div className="bg-gray-50 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-semibold text-gray-900">
-                        {comment.author}
+                        {comment.username || `User${comment.user_address?.substring(0, 6)}`}
                       </span>
                       <span className="text-xs text-gray-500">
-                        {formatTimestamp(comment.timestamp)}
+                        {formatTimestamp(comment.created_at)}
                       </span>
                     </div>
                     <p className="text-sm text-gray-700 leading-relaxed">
-                      {comment.text}
+                      {comment.comment_text}
                     </p>
                   </div>
-                  
+
                   {/* Comment actions - could add later */}
                   {/* <div className="flex items-center space-x-4 mt-1 ml-3">
                     <button className="text-xs text-gray-500 hover:text-blue-500">

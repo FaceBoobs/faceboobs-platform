@@ -1,42 +1,37 @@
 // src/components/CommentButton.js
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Loader2 } from 'lucide-react';
-import { useComments } from '../contexts/CommentsContext';
+import { MessageCircle } from 'lucide-react';
+import { SupabaseService } from '../services/supabaseService';
 import CommentModal from './CommentModal';
 
 const CommentButton = ({ contentId, contentAuthor, className = "", size = 20 }) => {
-  const { getCommentCount, initializeComments } = useComments();
   const [showModal, setShowModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
 
-  // Get current comment count
-  const commentCount = getCommentCount(contentId);
-
-  // Initialize comments for this content on mount
+  // Fetch comment count on mount and when modal closes
   useEffect(() => {
-    if (contentId) {
-      initializeComments(contentId);
-    }
-  }, [contentId, initializeComments]);
+    const fetchCommentCount = async () => {
+      if (contentId) {
+        try {
+          const result = await SupabaseService.getCommentsForPost(contentId);
+          if (result.success) {
+            setCommentCount(result.data?.length || 0);
+          }
+        } catch (error) {
+          console.error('Error fetching comment count:', error);
+        }
+      }
+    };
 
-  const handleClick = async (e) => {
+    fetchCommentCount();
+  }, [contentId, showModal]); // Refetch when modal closes
+
+  const handleClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // Prevent multiple clicks while loading
-    if (isLoading) return;
-
-    setIsLoading(true);
-
-    // Ensure comments are loaded before opening modal
-    try {
-      await initializeComments(contentId);
-    } catch (error) {
-      console.error('Error loading comments:', error);
-    } finally {
-      setIsLoading(false);
-      setShowModal(true);
-    }
+    // Open modal directly - comments will be loaded by the modal itself
+    setShowModal(true);
   };
 
   const handleCloseModal = () => {
@@ -47,15 +42,10 @@ const CommentButton = ({ contentId, contentAuthor, className = "", size = 20 }) 
     <>
       <button
         onClick={handleClick}
-        disabled={isLoading}
-        className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-all duration-200 text-gray-600 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-all duration-200 text-gray-600 hover:text-blue-500 hover:bg-blue-50 ${className}`}
         aria-label={`View ${commentCount} comments`}
       >
-        {isLoading ? (
-          <Loader2 size={size} className="animate-spin" />
-        ) : (
-          <MessageCircle size={size} />
-        )}
+        <MessageCircle size={size} />
         <span className="text-sm font-medium">
           {commentCount}
         </span>
