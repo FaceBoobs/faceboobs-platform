@@ -202,13 +202,23 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
   };
 
   const formatTimeAgo = (timestamp) => {
+    if (!timestamp) return 'just now';
+
+    // Handle both timestamp numbers and ISO date strings
+    const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(timestamp);
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'just now';
+    }
+
     const now = Date.now();
-    const diff = now - timestamp;
+    const diff = now - date.getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
 
-    if (minutes < 1) return 'Just now';
+    if (minutes < 1) return 'just now';
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     return `${days}d ago`;
@@ -419,7 +429,7 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
                             <span className="text-gray-800">{comment.content || comment.text || ''}</span>
                           </div>
                           <div className="flex items-center space-x-4 mt-1">
-                            <span className="text-xs text-gray-500">{formatTimeAgo(comment.timestamp)}</span>
+                            <span className="text-xs text-gray-500">{formatTimeAgo(comment.created_at || comment.timestamp)}</span>
                             <button className="text-xs text-gray-600 font-semibold hover:text-gray-800">
                               Reply
                             </button>

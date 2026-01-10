@@ -42,7 +42,16 @@ const PostModal = ({ post, onClose }) => {
   };
 
   const formatTime = (timestamp) => {
-    const date = new Date(timestamp * 1000);
+    if (!timestamp) return 'Unknown date';
+
+    // Handle both timestamp numbers and ISO date strings
+    const date = typeof timestamp === 'number' ? new Date(timestamp * 1000) : new Date(timestamp);
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Unknown date';
+    }
+
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -146,7 +155,7 @@ const PostModal = ({ post, onClose }) => {
                       <span className="text-gray-700">{comment.content || comment.text}</span>
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
-                      {new Date(comment.timestamp).toLocaleDateString()}
+                      {formatTime(comment.created_at || comment.timestamp)}
                     </p>
                   </div>
                 </div>

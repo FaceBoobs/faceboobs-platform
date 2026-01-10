@@ -426,9 +426,14 @@ const Home = () => {
   };
 
   const formatTimeAgo = (timestamp) => {
+    if (!timestamp || isNaN(timestamp)) return 'Just now';
+
     const now = Math.floor(Date.now() / 1000);
     const diff = now - timestamp;
-    
+
+    // Handle negative or invalid differences
+    if (isNaN(diff) || diff < 0) return 'Just now';
+
     if (diff < 60) return 'Just now';
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;

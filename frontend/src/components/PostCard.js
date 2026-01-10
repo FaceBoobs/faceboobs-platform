@@ -28,7 +28,16 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
   }, []);
 
   const formatTimestamp = (timestamp) => {
-    const date = new Date(timestamp * 1000);
+    if (!timestamp) return 'Unknown date';
+
+    // Handle both timestamp numbers and ISO date strings
+    const date = typeof timestamp === 'number' ? new Date(timestamp * 1000) : new Date(timestamp);
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Unknown date';
+    }
+
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 

@@ -156,7 +156,15 @@ const PostDetail = () => {
   };
 
   const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'Unknown date';
+
     const date = new Date(timestamp);
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Unknown date';
+    }
+
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
