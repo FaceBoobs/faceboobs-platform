@@ -367,15 +367,7 @@ export class SupabaseService {
 
       const { data, error } = await supabase
         .from('comments')
-        .select(`
-          id,
-          post_id,
-          user_address,
-          username,
-          content,
-          avatar,
-          created_at
-        `)
+        .select('*')
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 

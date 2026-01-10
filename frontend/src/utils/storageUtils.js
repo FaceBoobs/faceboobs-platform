@@ -123,7 +123,7 @@ export const commentsStorage = {
 
     const newComment = {
       id: Date.now().toString(),
-      text: comment.text,
+      text: comment.content || comment.text,
       author: comment.author,
       authorAddress: comment.authorAddress,
       timestamp: Date.now(),
