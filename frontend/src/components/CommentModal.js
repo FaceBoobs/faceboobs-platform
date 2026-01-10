@@ -48,9 +48,9 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
               console.log(`💬 Comment ${index + 1}:`, {
                 id: comment.id,
                 username: comment.username,
-                comment_text: comment.comment_text,
-                has_text: !!comment.comment_text,
-                text_length: comment.comment_text?.length || 0
+                content: comment.content,
+                has_content: !!comment.content,
+                content_length: comment.content?.length || 0
               });
             });
 
@@ -142,18 +142,18 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
         post_id: parseInt(contentId),
         user_address: account.toLowerCase(),
         username: user.username || `User${account.substring(0, 6)}`,
-        comment_text: commentText.trim(),
+        content: commentText.trim(),
         avatar: user.profileImage || user.avatarHash || null
       };
 
       console.log('📤 [CommentModal] Creating comment:', commentData);
-      console.log('📝 [CommentModal] Comment text length:', commentData.comment_text.length);
+      console.log('📝 [CommentModal] Comment text length:', commentData.content.length);
       const result = await SupabaseService.createComment(commentData);
 
       if (result.success) {
         console.log('✅ [CommentModal] Comment created successfully');
         console.log('📦 [CommentModal] Returned data:', result.data);
-        console.log('💬 [CommentModal] Returned comment_text:', result.data?.comment_text);
+        console.log('💬 [CommentModal] Returned content:', result.data?.content);
 
         toast.success('Comment posted!');
 
@@ -277,9 +277,9 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
                         {formatTimestamp(comment.created_at)}
                       </span>
                     </div>
-                    {comment.comment_text ? (
+                    {comment.content ? (
                       <p className="text-sm text-gray-700 leading-relaxed break-words">
-                        {comment.comment_text}
+                        {comment.content}
                       </p>
                     ) : (
                       <p className="text-sm text-red-500 italic">

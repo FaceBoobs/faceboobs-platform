@@ -372,7 +372,7 @@ export class SupabaseService {
           post_id,
           user_address,
           username,
-          comment_text,
+          content,
           avatar,
           created_at
         `)

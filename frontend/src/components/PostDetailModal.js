@@ -416,7 +416,7 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
                         <div className="flex-1 min-w-0">
                           <div className="text-sm">
                             <span className="font-semibold text-gray-900 mr-2">{displayName}</span>
-                            <span className="text-gray-800">{comment.text || comment.content || ''}</span>
+                            <span className="text-gray-800">{comment.content || comment.text || ''}</span>
                           </div>
                           <div className="flex items-center space-x-4 mt-1">
                             <span className="text-xs text-gray-500">{formatTimeAgo(comment.timestamp)}</span>
