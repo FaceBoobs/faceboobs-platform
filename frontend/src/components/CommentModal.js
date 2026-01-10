@@ -13,6 +13,7 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const modalRef = useRef(null);
   const textareaRef = useRef(null);
   const commentsEndRef = useRef(null);
@@ -23,8 +24,19 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
       if (isOpen && contentId) {
         setIsLoadingComments(true);
         setComments([]); // Reset comments when loading
+        setLoadError(false); // Reset error state
         try {
           console.log('📥 [CommentModal] Fetching comments for post:', contentId);
+
+          // Validate contentId
+          if (!contentId || isNaN(parseInt(contentId))) {
+            console.warn('⚠️ [CommentModal] Invalid post ID:', contentId);
+            setComments([]);
+            setLoadError(false);
+            setIsLoadingComments(false);
+            return;
+          }
+
           const result = await SupabaseService.getCommentsForPost(contentId);
 
           if (result.success) {
@@ -43,22 +55,25 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
             });
 
             setComments(result.data || []);
+            setLoadError(false);
           } else {
-            console.error('❌ Failed to load comments:', result.error);
-            toast.error('Failed to load comments');
+            // Don't show error toast - just log and set error state
+            console.warn('⚠️ [CommentModal] Failed to load comments:', result.error);
             setComments([]);
+            setLoadError(true);
           }
         } catch (error) {
-          console.error('Error loading comments:', error);
-          toast.error('Error loading comments');
+          // Don't show error toast - just log and set error state
+          console.warn('⚠️ [CommentModal] Error loading comments:', error);
           setComments([]);
+          setLoadError(true);
         } finally {
           setIsLoadingComments(false);
         }
       }
     };
     loadComments();
-  }, [isOpen, contentId, toast]);
+  }, [isOpen, contentId]);
 
   // Auto-focus textarea when modal opens
   useEffect(() => {
@@ -156,11 +171,13 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
         textareaRef.current?.focus();
       } else {
         console.error('❌ [CommentModal] Failed to create comment:', result.error);
-        toast.error('Failed to post comment: ' + result.error);
+        // Show user-friendly error message
+        toast.error('Could not post comment. Please try again.');
       }
     } catch (error) {
       console.error('❌ [CommentModal] Error posting comment:', error);
-      toast.error('Error posting comment');
+      // Show user-friendly error message
+      toast.error('Could not post comment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -187,7 +204,7 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
           <div className="flex items-center space-x-3">
             <MessageCircle className="text-blue-500" size={24} />
             <h2 className="text-xl font-semibold text-gray-900">
-              Comments ({comments.length})
+              Comments {isLoadingComments ? '(...)' : `(${comments.length})`}
             </h2>
           </div>
           <button
@@ -212,6 +229,14 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
                   </div>
                 </div>
               ))}
+            </div>
+          ) : comments.length === 0 && loadError ? (
+            <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+              <MessageCircle size={48} className="text-gray-300 mb-4" />
+              <p className="text-lg font-medium mb-2 text-gray-700">Could not load comments</p>
+              <p className="text-sm text-center text-gray-600">
+                You can still add a new comment below
+              </p>
             </div>
           ) : comments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-gray-500">

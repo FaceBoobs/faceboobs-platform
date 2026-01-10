@@ -16,9 +16,14 @@ const CommentButton = ({ contentId, contentAuthor, className = "", size = 20 }) 
           const result = await SupabaseService.getCommentsForPost(contentId);
           if (result.success) {
             setCommentCount(result.data?.length || 0);
+          } else {
+            // Don't show error, just keep count at 0
+            console.warn('⚠️ [CommentButton] Could not fetch count for post:', contentId);
+            setCommentCount(0);
           }
         } catch (error) {
-          console.error('Error fetching comment count:', error);
+          console.warn('⚠️ [CommentButton] Error fetching comment count:', error);
+          setCommentCount(0);
         }
       }
     };
@@ -30,7 +35,8 @@ const CommentButton = ({ contentId, contentAuthor, className = "", size = 20 }) 
     e.preventDefault();
     e.stopPropagation();
 
-    // Open modal directly - comments will be loaded by the modal itself
+    // Always open modal regardless of comment loading status
+    console.log('💬 [CommentButton] Opening comments modal for post:', contentId);
     setShowModal(true);
   };
 
