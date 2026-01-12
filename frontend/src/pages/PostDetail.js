@@ -10,6 +10,7 @@ import { SupabaseService } from '../services/supabaseService';
 import LikeButton from '../components/LikeButton';
 import CommentButton from '../components/CommentButton';
 import ShareButton from '../components/ShareButton';
+import RegisterPostOnBlockchain from '../components/RegisterPostOnBlockchain';
 import { ethers } from 'ethers';
 
 const PostDetail = () => {
@@ -244,6 +245,16 @@ const PostDetail = () => {
               </div>
             </div>
           </div>
+
+          {/* Show blockchain registration prompt for post owner if needed */}
+          {account && post.creator_address?.toLowerCase() === account.toLowerCase() && (
+            <div className="px-4 pt-4">
+              <RegisterPostOnBlockchain
+                post={post}
+                onSuccess={(updatedPost) => setPost(updatedPost)}
+              />
+            </div>
+          )}
 
           {/* Post Image/Content */}
           <div className="relative">

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS posts (
     id SERIAL PRIMARY KEY,
     content_id INTEGER,
+    blockchain_content_id TEXT, -- Blockchain content ID for premium posts
     creator_address TEXT NOT NULL,
     username TEXT,
     description TEXT,
