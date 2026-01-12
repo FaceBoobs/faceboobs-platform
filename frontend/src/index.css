@@ -22,6 +22,11 @@ body {
   background: transparent !important;
   min-height: 100vh;
   overflow-x: hidden;
+  /* Mobile optimizations */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  /* Safe area for iPhone notch */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 #root {
@@ -215,4 +220,122 @@ nav {
 .backdrop-blur {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+/* ===== MOBILE OPTIMIZATIONS ===== */
+
+/* Smooth iOS scrolling */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Main content padding for bottom navigation */
+main,
+.main-content,
+[class*="min-h-screen"] {
+  padding-bottom: max(100px, env(safe-area-inset-bottom)) !important;
+}
+
+/* Fix touch targets - minimum 44x44px */
+button,
+a,
+[role="button"],
+input[type="checkbox"],
+input[type="radio"] {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+
+/* Ensure clickable elements have proper z-index */
+button,
+a,
+[role="button"],
+.clickable {
+  position: relative;
+  z-index: 10;
+  touch-action: manipulation;
+}
+
+/* Decorative elements don't block clicks */
+.decoration,
+.background-pattern,
+[class*="absolute"][class*="opacity-"] {
+  pointer-events: none;
+}
+
+/* Bottom navigation safe area */
+nav[class*="bottom"],
+.bottom-navigation,
+footer {
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 50 !important;
+}
+
+/* Disable pull-to-refresh on iOS */
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Prevent zoom on input focus (iOS) */
+input,
+textarea,
+select {
+  font-size: 16px !important; /* Prevents iOS zoom */
+}
+
+/* Fix modal/overlay z-index */
+.modal,
+[role="dialog"],
+.overlay {
+  z-index: 100 !important;
+}
+
+/* Chat/messages specific mobile fixes */
+.messages-container,
+.chat-container {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+/* Prevent text selection on buttons (better mobile feel) */
+button {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Active/touch feedback */
+button:active,
+a:active,
+[role="button"]:active {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 768px) {
+  /* Increase spacing for mobile */
+  .space-y-2 { --space-y-reverse: 0; margin-top: calc(0.75rem * calc(1 - var(--space-y-reverse))); margin-bottom: calc(0.75rem * var(--space-y-reverse)); }
+  .space-y-4 { --space-y-reverse: 0; margin-top: calc(1.5rem * calc(1 - var(--space-y-reverse))); margin-bottom: calc(1.5rem * var(--space-y-reverse)); }
+
+  /* Larger text for readability */
+  body { font-size: 16px; }
+
+  /* Better padding on mobile */
+  .p-4 { padding: 1.5rem !important; }
+  .px-4 { padding-left: 1.5rem !important; padding-right: 1.5rem !important; }
+  .py-4 { padding-top: 1.5rem !important; padding-bottom: 1.5rem !important; }
+
+  /* Full width modals on mobile */
+  .modal,
+  [role="dialog"] {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+  }
 }

@@ -96,7 +96,14 @@ const PostDetail = () => {
       setPurchasing(true);
 
       const priceInWei = ethers.parseEther(post.price.toString());
-      toast.info('🔐 Opening MetaMask for transaction confirmation...');
+
+      // Detect mobile wallet
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const walletType = window.ethereum?.isMetaMask ? 'MetaMask' :
+                        window.ethereum?.isTrust ? 'Trust Wallet' :
+                        'wallet';
+
+      toast.info(`🔐 Opening ${walletType} for transaction confirmation...`);
 
       const tx = await contract.buyContent(post.blockchain_content_id, {
         value: priceInWei,
@@ -123,7 +130,19 @@ const PostDetail = () => {
       setHasAccess(true);
     } catch (err) {
       console.error('❌ Purchase error:', err);
-      toast.error('Purchase failed. Please try again.');
+
+      // Better error messages for mobile
+      if (err.code === 4001 || err.code === 'ACTION_REJECTED') {
+        toast.error('Transaction cancelled by user.');
+      } else if (err.code === -32603 || err.message?.includes('insufficient funds')) {
+        toast.error('Insufficient BNB balance for purchase and gas fees.');
+      } else if (err.message?.includes('network')) {
+        toast.error('Network error. Please check your connection and try again.');
+      } else if (err.message?.includes('gas')) {
+        toast.error('Gas estimation failed. Try increasing your gas limit.');
+      } else {
+        toast.error('Purchase failed. Please try again.');
+      }
     } finally {
       setPurchasing(false);
     }

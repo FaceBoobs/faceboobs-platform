@@ -47,12 +47,17 @@ function AppContent() {
   } = useWeb3();
   const { toast } = useToast();
 
-  const [showLoginModal, setShowLoginModal] = React.useState(!user && account);
+  const [showLoginModal, setShowLoginModal] = React.useState(false);
   const [showCreatorSuccessModal, setShowCreatorSuccessModal] = React.useState(false);
 
   React.useEffect(() => {
     if (account && !user) {
-      setShowLoginModal(true);
+      // Check if profile was already completed for this wallet
+      const profileCompleted = localStorage.getItem(`profileCompleted_${account.toLowerCase()}`);
+
+      if (!profileCompleted) {
+        setShowLoginModal(true);
+      }
     } else {
       setShowLoginModal(false);
     }
@@ -69,6 +74,10 @@ function AppContent() {
       
       if (result && result.success) {
         setShowLoginModal(false);
+        // Mark profile as completed for this wallet
+        if (account) {
+          localStorage.setItem(`profileCompleted_${account.toLowerCase()}`, 'true');
+        }
         toast.success(result.message);
       } else if (result && result.message) {
         toast.error(result.message);

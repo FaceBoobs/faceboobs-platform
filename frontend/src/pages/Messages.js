@@ -135,9 +135,26 @@ const Messages = () => {
     };
   }, [activeChat, user, account]);
 
+  // Auto-scroll only when new messages arrive and user is near bottom
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    const shouldAutoScroll = () => {
+      if (!messagesEndRef.current) return false;
+
+      const container = messagesEndRef.current.parentElement;
+      if (!container) return false;
+
+      // Check if user is near bottom (within 100px)
+      const isNearBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+
+      return isNearBottom;
+    };
+
+    // Only scroll if user is near bottom or if it's their own message
+    if (messages.length > 0 && shouldAutoScroll()) {
+      scrollToBottom();
+    }
+  }, [messages.length]); // Only trigger on new messages, not on all messages changes
 
   useEffect(() => {
     console.log('🔄 Modal state changed:', showNewChatModal);
@@ -234,8 +251,16 @@ const Messages = () => {
     };
   }, [account, activeChat]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (force = false) => {
+    if (!messagesEndRef.current) return;
+
+    // Use setTimeout to ensure DOM has updated
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: force ? 'auto' : 'smooth',
+        block: 'end'
+      });
+    }, 100);
   };
 
   const loadConversations = async () => {
@@ -333,47 +358,16 @@ const Messages = () => {
           setActiveChat(conversationsWithUserData[0]);
         }
       } else {
-        console.log('📭 No messages found, showing demo conversations');
-        createDemoConversations();
+        console.log('📭 No messages found');
+        setConversations([]);
       }
     } catch (error) {
       console.error('❌ Error loading conversations:', error);
       const errorMessage = error?.message || error?.details || 'Error loading conversations';
       toast.error(errorMessage);
-      createDemoConversations();
+      setConversations([]);
     } finally {
       setLoadingConversations(false);
-    }
-  };
-
-  const createDemoConversations = () => {
-    console.log('🎯 Creating demo conversations for testing');
-    const demoConversations = [
-      {
-        id: '0x1234567890123456789012345678901234567890',
-        username: 'Demo User 1',
-        address: '0x1234567890123456789012345678901234567890',
-        lastMessage: 'This is a demo conversation for testing',
-        timestamp: Date.now() - 300000,
-        unread: false,
-        avatar: '🎨',
-        isDemoConversation: true
-      },
-      {
-        id: '0x2345678901234567890123456789012345678901',
-        username: 'Demo User 2',
-        address: '0x2345678901234567890123456789012345678901',
-        lastMessage: 'Another demo conversation',
-        timestamp: Date.now() - 3600000,
-        unread: false,
-        avatar: '💰',
-        isDemoConversation: true
-      }
-    ];
-
-    setConversations(demoConversations);
-    if (demoConversations.length > 0) {
-      setActiveChat(demoConversations[0]);
     }
   };
 
@@ -472,11 +466,6 @@ const Messages = () => {
 
     if (!activeChat || !account) {
       toast.error('Please select a conversation');
-      return;
-    }
-
-    if (activeChat.isDemoConversation) {
-      toast.error('This is a demo conversation. Start a real chat to send messages.');
       return;
     }
 
