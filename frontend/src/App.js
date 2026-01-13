@@ -50,6 +50,43 @@ function AppContent() {
   const [showLoginModal, setShowLoginModal] = React.useState(false);
   const [showCreatorSuccessModal, setShowCreatorSuccessModal] = React.useState(false);
 
+  // Global context menu prevention for premium content security
+  React.useEffect(() => {
+    const preventContextMenu = (e) => {
+      // Check if the target or any parent has premium content attributes
+      const target = e.target;
+      const isPremiumContent = target.closest('.premium-content, .paid-content, .locked-content, [data-premium="true"], [data-paid="true"]');
+
+      if (isPremiumContent) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    // Prevent image dragging on premium content
+    const preventDragStart = (e) => {
+      const target = e.target;
+      if (target.tagName === 'IMG' || target.tagName === 'VIDEO') {
+        const isPremiumContent = target.closest('.premium-content, .paid-content, .locked-content, [data-premium="true"], [data-paid="true"]');
+        if (isPremiumContent) {
+          e.preventDefault();
+          return false;
+        }
+      }
+    };
+
+    // Add global event listeners
+    document.addEventListener('contextmenu', preventContextMenu, true);
+    document.addEventListener('dragstart', preventDragStart, true);
+
+    // Cleanup on unmount
+    return () => {
+      document.removeEventListener('contextmenu', preventContextMenu, true);
+      document.removeEventListener('dragstart', preventDragStart, true);
+    };
+  }, []);
+
   React.useEffect(() => {
     if (account && !user) {
       // Check if profile was already completed for this wallet

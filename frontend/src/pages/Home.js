@@ -614,11 +614,18 @@ const Home = () => {
 
         <div className="relative w-full">
           {content.isPaid && !hasAccess ? (
-            <div className="relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center w-full max-h-[500px] md:max-h-[900px]">
+            <div
+              className="premium-content relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center w-full max-h-[500px] md:max-h-[900px]"
+              data-premium="true"
+              data-paid="true"
+              onContextMenu={(e) => e.preventDefault()}
+            >
               <img
                 src={content.content}
                 alt="Preview"
                 className="w-full h-auto object-contain blur-lg max-h-[500px] md:max-h-[900px]"
+                draggable="false"
+                onContextMenu={(e) => e.preventDefault()}
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center text-white bg-black bg-opacity-50 p-6 rounded-lg">
@@ -630,7 +637,14 @@ const Home = () => {
                   <button
                     onClick={handlePurchase}
                     disabled={purchasing}
-                    className="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 disabled:opacity-50 transition-colors"
+                    className="unlock-button bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 disabled:opacity-50 transition-colors"
+                    data-unlock="true"
+                    style={{
+                      pointerEvents: 'auto',
+                      zIndex: 9999,
+                      position: 'relative',
+                      touchAction: 'manipulation'
+                    }}
                   >
                     {purchasing ? 'Purchasing...' : `Buy for ${content.price} BNB`}
                   </button>
@@ -643,6 +657,8 @@ const Home = () => {
                 src={content.content}
                 alt="Content"
                 className="w-full h-auto object-contain cursor-pointer max-h-[500px] md:max-h-[900px]"
+                draggable="false"
+                onContextMenu={(e) => e.preventDefault()}
                 onClick={() => {
                   setSelectedPost(content);
                   setShowPostDetail(true);

@@ -130,7 +130,12 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
       {/* Content */}
       <div className="relative">
         {content.isPaid && !hasAccess ? (
-          <div className="p-8 text-center bg-gray-50">
+          <div
+            className="premium-content p-8 text-center bg-gray-50"
+            data-premium="true"
+            data-paid="true"
+            onContextMenu={(e) => e.preventDefault()}
+          >
             <Lock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Premium Content</h3>
             <p className="text-gray-600 mb-4">
@@ -142,7 +147,14 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
               </span>
               <button
                 onClick={handleBuyContent}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="unlock-button bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                data-unlock="true"
+                style={{
+                  pointerEvents: 'auto',
+                  zIndex: 9999,
+                  position: 'relative',
+                  touchAction: 'manipulation'
+                }}
               >
                 Purchase Access
               </button>
@@ -171,6 +183,8 @@ const PostCard = ({ content, user, onBuyContent, hasAccess, onDeleteContent }) =
                     alt="Content"
                     onClick={handleImageClick}
                     className="w-full h-auto object-contain max-h-[900px] cursor-pointer hover:opacity-95 transition-opacity"
+                    draggable="false"
+                    onContextMenu={(e) => e.preventDefault()}
                     onError={(e) => {
                       e.target.style.display = 'none';
                       e.target.nextSibling.style.display = 'flex';

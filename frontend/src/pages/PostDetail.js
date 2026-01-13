@@ -321,7 +321,12 @@ const PostDetail = () => {
           {/* Post Image/Content */}
           <div className="relative">
             {post.is_paid && !hasAccess ? (
-              <div className="p-12 text-center bg-gray-50">
+              <div
+                className="premium-content p-12 text-center bg-gray-50"
+                data-premium="true"
+                data-paid="true"
+                onContextMenu={(e) => e.preventDefault()}
+              >
                 <Lock className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Premium Content</h3>
                 <p className="text-gray-600 mb-6">
@@ -334,7 +339,14 @@ const PostDetail = () => {
                   <button
                     onClick={handlePurchase}
                     disabled={purchasing}
-                    className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 font-semibold"
+                    className="unlock-button bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 font-semibold"
+                    data-unlock="true"
+                    style={{
+                      pointerEvents: 'auto',
+                      zIndex: 9999,
+                      position: 'relative',
+                      touchAction: 'manipulation'
+                    }}
                   >
                     {purchasing ? 'Processing...' : 'Purchase Access'}
                   </button>
@@ -391,6 +403,8 @@ const PostDetail = () => {
                       src={mediaSrc}
                       controls
                       className="w-full max-h-[600px] object-contain"
+                      controlsList="nodownload"
+                      onContextMenu={(e) => e.preventDefault()}
                       onError={(e) => {
                         console.error('❌ Video load error:', e);
                       }}
@@ -400,6 +414,8 @@ const PostDetail = () => {
                       src={mediaSrc}
                       alt="Post content"
                       className="w-full max-h-[600px] object-contain"
+                      draggable="false"
+                      onContextMenu={(e) => e.preventDefault()}
                       onError={(e) => {
                         console.error('❌ Image load error:', e);
                       }}

@@ -256,18 +256,27 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
         <div className="flex-1 md:flex-1 bg-black flex items-center justify-center min-h-0 relative">
           {content.isPaid && !hasAccess ? (
             // Locked content with blur effect
-            <div className="relative w-full h-full flex items-center justify-center">
+            <div
+              className="premium-content relative w-full h-full flex items-center justify-center"
+              data-premium="true"
+              data-paid="true"
+              onContextMenu={(e) => e.preventDefault()}
+            >
               {displayUrl && (
                 isVideo ? (
                   <video
                     src={displayUrl}
                     className="max-w-full max-h-full object-contain blur-xl opacity-30"
+                    controlsList="nodownload"
+                    onContextMenu={(e) => e.preventDefault()}
                   />
                 ) : (
                   <img
                     src={displayUrl}
                     alt="Locked content preview"
                     className="max-w-full max-h-full object-contain blur-xl opacity-30"
+                    draggable="false"
+                    onContextMenu={(e) => e.preventDefault()}
                   />
                 )
               )}
@@ -282,7 +291,14 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
                   <button
                     onClick={handlePurchase}
                     disabled={purchasing}
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 font-semibold"
+                    className="unlock-button bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 font-semibold"
+                    data-unlock="true"
+                    style={{
+                      pointerEvents: 'auto',
+                      zIndex: 9999,
+                      position: 'relative',
+                      touchAction: 'manipulation'
+                    }}
                   >
                     {purchasing ? 'Purchasing...' : `Buy for ${content.price} BNB`}
                   </button>
@@ -298,6 +314,8 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
                     src={displayUrl}
                     controls
                     className="max-w-full max-h-full object-contain"
+                    controlsList="nodownload"
+                    onContextMenu={(e) => e.preventDefault()}
                     onError={(e) => {
                       e.target.style.display = 'none';
                       e.target.nextSibling.style.display = 'flex';
@@ -308,6 +326,8 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
                     src={displayUrl}
                     alt="Post content"
                     className="max-w-full max-h-full object-contain"
+                    draggable="false"
+                    onContextMenu={(e) => e.preventDefault()}
                     onError={(e) => {
                       e.target.style.display = 'none';
                       e.target.nextSibling.style.display = 'flex';
