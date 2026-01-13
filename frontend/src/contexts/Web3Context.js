@@ -181,6 +181,8 @@ export const Web3Provider = ({ children }) => {
       setContractError(null);
 
       if (userAccount) {
+        // Auto-register user on blockchain if not already registered
+        await autoRegisterOnBlockchain(contractInstance, userAccount);
         await loadUserData(userAccount);
       }
 
@@ -190,6 +192,36 @@ export const Web3Provider = ({ children }) => {
       setContractError('Failed to initialize contract. Please check your connection.');
       setContract(null);
       setSigner(null);
+    }
+  };
+
+  const autoRegisterOnBlockchain = async (contractInstance, userAddress) => {
+    try {
+      console.log('🔍 Checking if user is registered on blockchain...');
+
+      // Check if user exists on blockchain
+      const isRegistered = await contractInstance.isUserRegistered(userAddress);
+
+      if (!isRegistered) {
+        console.log('📝 Auto-registering user on blockchain...');
+
+        try {
+          const tx = await contractInstance.registerUser();
+          console.log('⏳ Registration transaction sent:', tx.hash);
+          await tx.wait();
+          console.log('✅ User registered on blockchain successfully');
+        } catch (regError) {
+          // Silently handle if already registered error
+          if (regError.message && !regError.message.toLowerCase().includes('already registered')) {
+            console.error('❌ Blockchain registration failed:', regError);
+          }
+        }
+      } else {
+        console.log('✅ User already registered on blockchain');
+      }
+    } catch (error) {
+      // Don't block app loading if blockchain check fails
+      console.warn('⚠️ Blockchain registration check failed:', error);
     }
   };
 

@@ -11,6 +11,7 @@ import LikeButton from '../components/LikeButton';
 import CommentButton from '../components/CommentButton';
 import ShareButton from '../components/ShareButton';
 import RegisterPostOnBlockchain from '../components/RegisterPostOnBlockchain';
+import { getWalletName, isMobileDevice } from '../utils/walletDetection';
 import { ethers } from 'ethers';
 
 const PostDetail = () => {
@@ -82,28 +83,54 @@ const PostDetail = () => {
   };
 
   const handlePurchase = async () => {
-    if (!contract || !account || !post) {
-      toast.error('Please connect your wallet first.');
+    // Wallet connection check
+    if (!window.ethereum || !account) {
+      toast.error('Please connect your wallet first.', { id: 'wallet-connect-error' });
+      return;
+    }
+
+    if (!contract) {
+      toast.error('Smart contract not loaded. Please refresh the page.', { id: 'contract-error' });
+      return;
+    }
+
+    if (!post) {
+      toast.error('Post not found.', { id: 'post-error' });
       return;
     }
 
     if (!post.blockchain_content_id) {
-      toast.error('This post is not registered on blockchain. Cannot purchase.');
+      toast.error('This post is not registered on blockchain. Cannot purchase.', { id: 'blockchain-id-error' });
       return;
     }
 
     try {
       setPurchasing(true);
 
+      // Check if user is registered on blockchain
+      try {
+        const isRegistered = await contract.isUserRegistered(account);
+        if (!isRegistered) {
+          toast.info('Registering your account on blockchain...', { id: 'register-info' });
+          const regTx = await contract.registerUser();
+          await regTx.wait();
+          toast.success('Account registered successfully!', { id: 'register-success' });
+        }
+      } catch (regError) {
+        console.warn('Registration check failed:', regError);
+        // Continue with purchase attempt
+      }
+
       const priceInWei = ethers.parseEther(post.price.toString());
 
       // Detect mobile wallet
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      const walletType = window.ethereum?.isMetaMask ? 'MetaMask' :
-                        window.ethereum?.isTrust ? 'Trust Wallet' :
-                        'wallet';
+      const walletType = getWalletName();
+      const mobile = isMobileDevice();
 
-      toast.info(`🔐 Opening ${walletType} for transaction confirmation...`);
+      toast.info(`🔐 Opening ${walletType} for transaction...`, {
+        id: 'purchase-open',
+        dismissPrevious: true
+      });
 
       const tx = await contract.buyContent(post.blockchain_content_id, {
         value: priceInWei,
@@ -111,11 +138,15 @@ const PostDetail = () => {
       });
 
       console.log('⏳ Transaction sent:', tx.hash);
-      toast.info('⏳ Transaction sent! Waiting for confirmation...');
+      toast.info('⏳ Transaction sent! Waiting for confirmation...', {
+        id: 'purchase-pending',
+        dismissPrevious: true
+      });
 
       const receipt = await tx.wait();
       console.log('✅ Transaction confirmed:', receipt);
 
+      // Save purchase to database
       const purchaseData = {
         user_address: account.toLowerCase(),
         post_id: parseInt(post.id),
@@ -126,22 +157,34 @@ const PostDetail = () => {
 
       await SupabaseService.createPurchase(purchaseData);
 
-      toast.success('🎉 Content purchased successfully!');
+      toast.success('🎉 Content purchased successfully!', {
+        id: 'purchase-success',
+        dismissPrevious: true
+      });
+
       setHasAccess(true);
     } catch (err) {
       console.error('❌ Purchase error:', err);
 
-      // Better error messages for mobile
+      // Clear any pending toasts
+      toast.dismiss('purchase-open');
+      toast.dismiss('purchase-pending');
+
+      // Specific error messages
       if (err.code === 4001 || err.code === 'ACTION_REJECTED') {
-        toast.error('Transaction cancelled by user.');
+        toast.error('Transaction cancelled.', { id: 'purchase-cancelled' });
       } else if (err.code === -32603 || err.message?.includes('insufficient funds')) {
-        toast.error('Insufficient BNB balance for purchase and gas fees.');
+        toast.error('Insufficient BNB for purchase and gas fees.', { id: 'purchase-insufficient' });
+      } else if (err.message?.includes('not registered')) {
+        toast.error('Account not registered. Please try again.', { id: 'purchase-not-registered' });
       } else if (err.message?.includes('network')) {
-        toast.error('Network error. Please check your connection and try again.');
+        toast.error('Network error. Check your connection.', { id: 'purchase-network' });
       } else if (err.message?.includes('gas')) {
-        toast.error('Gas estimation failed. Try increasing your gas limit.');
+        toast.error('Gas estimation failed.', { id: 'purchase-gas' });
+      } else if (err.message?.includes('revert')) {
+        toast.error('Transaction reverted. You may already own this content.', { id: 'purchase-revert' });
       } else {
-        toast.error('Purchase failed. Please try again.');
+        toast.error('Purchase failed. Please try again.', { id: 'purchase-failed' });
       }
     } finally {
       setPurchasing(false);
