@@ -50,40 +50,91 @@ function AppContent() {
   const [showLoginModal, setShowLoginModal] = React.useState(false);
   const [showCreatorSuccessModal, setShowCreatorSuccessModal] = React.useState(false);
 
-  // Global context menu prevention for premium content security
+  // CRITICAL SECURITY: Global event blocking for premium content
   React.useEffect(() => {
+    console.log('🔒 SECURITY: Installing global content protection...');
+
+    // Block ALL context menus on premium content
     const preventContextMenu = (e) => {
-      // Check if the target or any parent has premium content attributes
       const target = e.target;
-      const isPremiumContent = target.closest('.premium-content, .paid-content, .locked-content, [data-premium="true"], [data-paid="true"]');
+      const isPremiumContent = target.closest(
+        '.premium-content, .paid-content, .locked-content, .blur-content, [data-premium="true"], [data-paid="true"]'
+      );
 
       if (isPremiumContent) {
+        console.log('🚫 SECURITY: Context menu blocked on premium content');
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    };
+
+    // Block ALL text selection on premium content
+    const preventSelection = (e) => {
+      const target = e.target;
+      const isPremiumContent = target.closest(
+        '.premium-content, .paid-content, .locked-content, .blur-content, [data-premium="true"], [data-paid="true"]'
+      );
+
+      if (isPremiumContent) {
+        console.log('🚫 SECURITY: Text selection blocked on premium content');
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    };
+
+    // Block ALL dragging on premium content images/videos
+    const preventDragStart = (e) => {
+      const target = e.target;
+      if (target.tagName === 'IMG' || target.tagName === 'VIDEO') {
+        const isPremiumContent = target.closest(
+          '.premium-content, .paid-content, .locked-content, .blur-content, [data-premium="true"], [data-paid="true"]'
+        );
+        if (isPremiumContent) {
+          console.log('🚫 SECURITY: Drag blocked on premium media');
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          return false;
+        }
+      }
+    };
+
+    // Block copy events on premium content
+    const preventCopy = (e) => {
+      const target = e.target;
+      const isPremiumContent = target.closest(
+        '.premium-content, .paid-content, .locked-content, .blur-content, [data-premium="true"], [data-paid="true"]'
+      );
+
+      if (isPremiumContent) {
+        console.log('🚫 SECURITY: Copy blocked on premium content');
         e.preventDefault();
         e.stopPropagation();
         return false;
       }
     };
 
-    // Prevent image dragging on premium content
-    const preventDragStart = (e) => {
-      const target = e.target;
-      if (target.tagName === 'IMG' || target.tagName === 'VIDEO') {
-        const isPremiumContent = target.closest('.premium-content, .paid-content, .locked-content, [data-premium="true"], [data-paid="true"]');
-        if (isPremiumContent) {
-          e.preventDefault();
-          return false;
-        }
-      }
-    };
-
-    // Add global event listeners
+    // Install ALL security event listeners with capture phase for maximum blocking
     document.addEventListener('contextmenu', preventContextMenu, true);
+    document.addEventListener('selectstart', preventSelection, true);
     document.addEventListener('dragstart', preventDragStart, true);
+    document.addEventListener('copy', preventCopy, true);
+    document.addEventListener('cut', preventCopy, true);
+
+    console.log('✅ SECURITY: All content protection installed');
 
     // Cleanup on unmount
     return () => {
       document.removeEventListener('contextmenu', preventContextMenu, true);
+      document.removeEventListener('selectstart', preventSelection, true);
       document.removeEventListener('dragstart', preventDragStart, true);
+      document.removeEventListener('copy', preventCopy, true);
+      document.removeEventListener('cut', preventCopy, true);
+      console.log('🔓 SECURITY: Content protection removed');
     };
   }, []);
 

@@ -322,25 +322,25 @@ body {
   -webkit-touch-callout: none;
 }
 
-/* Premium/paid content protection */
+/* Premium/paid content protection - COMPREHENSIVE BLOCKING */
 .premium-content,
 .paid-content,
 .locked-content,
+.blur-content,
 [data-premium="true"],
 [data-paid="true"] {
-  /* Prevent selection */
+  /* Prevent ALL text selection methods */
   -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -khtml-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
   user-select: none !important;
 
-  /* Prevent context menu */
-  -webkit-touch-callout: none !important;
-
-  /* Prevent pointer events on content */
+  /* Prevent ALL pointer events on locked content */
   pointer-events: none !important;
 
-  /* Prevent dragging */
+  /* Prevent ALL dragging methods */
   -webkit-user-drag: none !important;
   -khtml-user-drag: none !important;
   -moz-user-drag: none !important;
@@ -371,35 +371,77 @@ body {
   pointer-events: none !important;
 }
 
-/* UNLOCK BUTTON - Must remain clickable! */
+/* UNLOCK OVERLAY - Container for unlock button */
+.unlock-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 50 !important;
+  pointer-events: none !important;
+}
+
+/* UNLOCK BUTTON - Must remain clickable with LARGE touch area! */
 .unlock-button,
 [data-unlock="true"],
 button[class*="unlock"],
 button[class*="purchase"] {
+  /* Override pointer events - MUST be clickable */
   pointer-events: auto !important;
+
+  /* Prevent text selection on button itself */
   -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
   user-select: none !important;
+
+  /* Touch optimization */
   touch-action: manipulation !important;
+
+  /* CRITICAL: Always on top */
   z-index: 9999 !important;
   position: relative !important;
 
-  /* Larger clickable area */
+  /* LARGE touch target for mobile */
   min-height: 60px !important;
-  padding: 20px 30px !important;
+  min-width: 200px !important;
+  padding: 20px 40px !important;
 
-  /* Ensure visibility */
+  /* Ensure visibility and clickability */
   cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
-/* Messages container fix */
-.messages-container,
-[class*="messages-container"] {
+/* Messages page structure - FIXED SCROLLING */
+.messages-page {
+  height: 100vh !important;
   display: flex !important;
   flex-direction: column !important;
-  height: calc(100vh - 120px) !important;
+  overflow: hidden !important;
+}
+
+.messages-list,
+.messages-container,
+[class*="messages-container"] {
+  flex: 1 !important;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-y: contain !important;
+  padding-bottom: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.message-input-container {
+  position: sticky !important;
+  bottom: 0 !important;
+  background: white !important;
+  padding: 10px !important;
+  z-index: 10 !important;
+  border-top: 1px solid #e5e7eb !important;
 }
 
 /* ===== MOBILE RESPONSIVE ===== */

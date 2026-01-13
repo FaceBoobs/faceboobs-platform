@@ -1267,7 +1267,7 @@ const Messages = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-4 border-t border-gray-200">
+            <div className="message-input-container p-4 border-t border-gray-200">
               {/* Hidden file input */}
               <input
                 ref={fileInputRef}
