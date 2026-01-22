@@ -399,12 +399,12 @@ body {
   pointer-events: auto !important;
 }
 
-/* UNLOCK BUTTON - Must remain clickable with LARGE touch area! */
+/* UNLOCK BUTTON - Responsive sizing */
 .unlock-button,
 [data-unlock="true"],
 button[class*="unlock"],
 button[class*="purchase"],
-button[class*="Buy for"] {
+.unlock-button-responsive {
   /* Override pointer events - MUST be clickable */
   pointer-events: auto !important;
 
@@ -421,11 +421,6 @@ button[class*="Buy for"] {
   z-index: 9999 !important;
   position: relative !important;
 
-  /* LARGE touch target for mobile */
-  min-height: 60px !important;
-  min-width: 200px !important;
-  padding: 20px 40px !important;
-
   /* Ensure visibility and clickability */
   cursor: pointer !important;
   display: inline-flex !important;
@@ -433,7 +428,30 @@ button[class*="Buy for"] {
   justify-content: center !important;
 }
 
+/* Responsive button sizing */
+@media (max-width: 768px) {
+  .unlock-button-responsive {
+    min-height: 44px !important;
+    min-width: 140px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .unlock-button,
+  .unlock-button-responsive {
+    min-height: 48px !important;
+    min-width: 180px !important;
+    padding: 12px 32px !important;
+  }
+}
+
 /* Messages page structure - RESPONSIVE DESKTOP/MOBILE */
+.messages-page-wrapper {
+  background: white !important;
+}
+
 .messages-container {
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-y: contain !important;
@@ -442,6 +460,11 @@ button[class*="Buy for"] {
 
 /* Desktop: normal layout */
 @media (min-width: 769px) {
+  .messages-page-wrapper {
+    min-height: 100vh !important;
+    background: white !important;
+  }
+
   .messages-container {
     overflow-y: auto !important;
     padding: 16px !important;
@@ -457,12 +480,26 @@ button[class*="Buy for"] {
 
 /* Mobile: fixed input at bottom */
 @media (max-width: 768px) {
-  /* Force white background on messages page to hide pink */
-  body:has([class*="messages"]) {
+  /* Force white background and prevent scroll on body/html */
+  body:has(.messages-page-wrapper) {
     background: white !important;
+    overflow: hidden !important;
+    height: 100vh !important;
+    position: fixed !important;
+    width: 100% !important;
   }
 
-  html {
+  html:has(.messages-page-wrapper) {
+    background: white !important;
+    overflow: hidden !important;
+    height: 100vh !important;
+  }
+
+  .messages-page-wrapper {
+    min-height: 100vh !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
     background: white !important;
   }
 
@@ -470,7 +507,7 @@ button[class*="Buy for"] {
     overflow-y: auto !important;
     overflow-x: hidden !important;
     padding: 10px !important;
-    padding-bottom: 80px !important;
+    padding-bottom: 120px !important; /* Increased from 80px to prevent photos being cut */
     height: calc(100vh - 140px) !important;
     max-height: calc(100vh - 140px) !important;
   }
@@ -491,7 +528,7 @@ button[class*="Buy for"] {
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   @media (max-width: 768px) {
     .messages-container {
-      padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+      padding-bottom: calc(120px + env(safe-area-inset-bottom)) !important;
       height: calc(100vh - 140px - env(safe-area-inset-bottom)) !important;
     }
 

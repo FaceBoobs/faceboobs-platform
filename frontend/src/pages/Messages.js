@@ -1042,7 +1042,7 @@ const Messages = () => {
   const showListView = isMobile ? !conversationId : true;
 
   return (
-    <div className="flex items-center justify-center min-h-screen" style={{ background: 'white' }}>
+    <div className="messages-page-wrapper flex items-center justify-center" style={{ background: 'white' }}>
       <div className="w-full md:max-w-6xl mx-auto bg-white md:rounded-xl md:shadow-sm md:border md:border-gray-200 overflow-hidden h-screen md:h-[600px] flex">
 
       {/* Conversation List - Hidden on mobile when viewing chat */}
@@ -1264,7 +1264,7 @@ const Messages = () => {
                                 touchAction: 'manipulation'
                               }}
                             >
-                              <Lock className="text-white mb-2" size={32} />
+                              <Lock className="text-white mb-2" size={24} />
                               <button
                                 onClick={() => handleUnlockMedia(message)}
                                 onTouchEnd={(e) => {
@@ -1272,10 +1272,8 @@ const Messages = () => {
                                   e.stopPropagation();
                                   handleUnlockMedia(message);
                                 }}
-                                className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors mt-2"
+                                className="unlock-button-responsive bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors mt-2 text-sm md:text-base"
                                 style={{
-                                  minHeight: '60px',
-                                  minWidth: '200px',
                                   touchAction: 'manipulation',
                                   cursor: 'pointer',
                                   zIndex: 10000,
