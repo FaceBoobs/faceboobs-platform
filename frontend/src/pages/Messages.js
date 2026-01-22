@@ -775,26 +775,39 @@ const Messages = () => {
 
   // Unlock paid media content
   const handleUnlockMedia = async (message) => {
+    console.log('🔵 handleUnlockMedia called!', {
+      messageId: message?.id,
+      hasBlockchainId: !!message?.blockchain_content_id,
+      price: message?.price
+    });
+
     if (!message || !message.blockchain_content_id) {
-      toast.error('Invalid content');
+      console.error('❌ Invalid message or missing blockchain_content_id');
+      toast.error('Invalid content - missing blockchain ID');
       return;
     }
 
     // Confirm purchase
+    console.log('📱 Showing confirmation dialog...');
     const confirmed = window.confirm(
       `Unlock this ${message.media_type} for ${message.price} BNB?`
     );
 
     if (!confirmed) {
+      console.log('❌ User cancelled confirmation');
       return;
     }
 
+    console.log('✅ User confirmed purchase');
+
     try {
       setUnlockingMedia(prev => ({ ...prev, [message.id]: true }));
-      console.log('🔓 Unlocking media:', {
+      console.log('🔓 Starting unlock process:', {
         messageId: message.id,
         blockchainContentId: message.blockchain_content_id,
-        price: message.price
+        price: message.price,
+        hasMetaMask: !!window.ethereum,
+        account: account
       });
 
       if (!window.ethereum) {
@@ -1029,8 +1042,8 @@ const Messages = () => {
   const showListView = isMobile ? !conversationId : true;
 
   return (
-    <div className="messages-page" style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'white' }}>
-      <div className="w-full md:max-w-6xl mx-auto bg-white md:rounded-xl md:shadow-sm md:border md:border-gray-200 overflow-hidden flex" style={{ height: '100%', flex: 1 }}>
+    <div className="flex items-center justify-center min-h-screen" style={{ background: 'white' }}>
+      <div className="w-full md:max-w-6xl mx-auto bg-white md:rounded-xl md:shadow-sm md:border md:border-gray-200 overflow-hidden h-screen md:h-[600px] flex">
 
       {/* Conversation List - Hidden on mobile when viewing chat */}
       <div className={`${showListView ? 'flex' : 'hidden'} ${isMobile ? 'w-full' : 'w-1/3'} border-r border-gray-200 flex-col`}>
@@ -1137,7 +1150,7 @@ const Messages = () => {
       <div className={`${showChatView ? 'flex' : 'hidden'} flex-1 flex-col`}>
         {activeChat ? (
           <>
-            <div className="messages-header p-4 border-b border-gray-200 flex items-center justify-between" style={{ flexShrink: 0, height: '60px', background: 'white', zIndex: 10 }}>
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 {/* Back button for mobile */}
                 {isMobile && (
@@ -1173,21 +1186,7 @@ const Messages = () => {
               </div>
             </div>
 
-            <div
-              className="messages-container flex-1 overflow-y-auto p-4"
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-                overflowX: 'hidden',
-                WebkitOverflowScrolling: 'touch',
-                overscrollBehaviorY: 'contain',
-                padding: '10px',
-                paddingBottom: '90px',
-                background: 'white',
-                display: 'flex',
-                flexDirection: 'column'
-              }}
-            >
+            <div className="messages-container flex-1 overflow-y-auto p-4 bg-white">
               {console.log('💬 Total messages to render:', messages.length)}
               {messages.map((message, index) => {
                 const senderLower = message.sender_address?.toLowerCase();
@@ -1222,27 +1221,69 @@ const Messages = () => {
                     {message.has_media && message.media_url && (
                       <div className="mb-2">
                         {message.is_paid && !message.is_unlocked && !message.isOwn ? (
-                          <div className="relative">
-                            <div className="relative overflow-hidden rounded">
-                              {message.media_type === 'image' ? (
-                                <img
-                                  src={message.media_url}
-                                  alt="Locked content"
-                                  className="w-full max-h-48 object-cover blur-lg"
-                                />
-                              ) : (
-                                <video
-                                  src={message.media_url}
-                                  className="w-full max-h-48 object-cover blur-lg"
-                                />
-                              )}
+                          <div
+                            className="relative premium-content locked-content"
+                            data-premium="true"
+                            data-paid="true"
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); return false; }}
+                            onTouchStart={(e) => e.preventDefault()}
+                            onMouseDown={(e) => e.preventDefault()}
+                            style={{
+                              userSelect: 'none',
+                              WebkitUserSelect: 'none',
+                              WebkitTouchCallout: 'none',
+                              touchAction: 'none'
+                            }}
+                          >
+                            <div
+                              className="relative overflow-hidden rounded bg-gray-900 flex items-center justify-center"
+                              style={{
+                                width: '100%',
+                                height: '192px',
+                                minHeight: '192px',
+                                pointerEvents: 'none'
+                              }}
+                            >
+                              {/* NO real content shown - only placeholder */}
+                              <div className="text-gray-600 text-center">
+                                <Lock size={48} className="mx-auto mb-2 text-gray-500" />
+                                <p className="text-sm">Locked {message.media_type}</p>
+                              </div>
                             </div>
                             <div
-                              className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center rounded cursor-pointer"
+                              className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center rounded cursor-pointer"
                               onClick={() => handleUnlockMedia(message)}
+                              onTouchEnd={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleUnlockMedia(message);
+                              }}
+                              style={{
+                                pointerEvents: 'auto',
+                                zIndex: 9999,
+                                touchAction: 'manipulation'
+                              }}
                             >
-                              <Lock className="text-white mb-2" size={24} />
-                              <p className="text-white text-xs">Unlock for {message.price} BNB</p>
+                              <Lock className="text-white mb-2" size={32} />
+                              <button
+                                onClick={() => handleUnlockMedia(message)}
+                                onTouchEnd={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleUnlockMedia(message);
+                                }}
+                                className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors mt-2"
+                                style={{
+                                  minHeight: '60px',
+                                  minWidth: '200px',
+                                  touchAction: 'manipulation',
+                                  cursor: 'pointer',
+                                  zIndex: 10000,
+                                  pointerEvents: 'auto'
+                                }}
+                              >
+                                Unlock for {message.price} BNB
+                              </button>
                             </div>
                           </div>
                         ) : (
@@ -1284,10 +1325,6 @@ const Messages = () => {
             <div
               className="message-input-container p-4 border-t border-gray-200"
               style={{
-                position: 'fixed',
-                bottom: '60px',
-                left: 0,
-                right: 0,
                 background: 'white',
                 padding: '10px',
                 borderTop: '1px solid #ddd',

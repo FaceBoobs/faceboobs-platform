@@ -433,57 +433,71 @@ button[class*="Buy for"] {
   justify-content: center !important;
 }
 
-/* Messages page structure - FIXED SCROLLING */
-.messages-page {
-  height: 100vh !important;
-  display: flex !important;
-  flex-direction: column !important;
-  background: white !important;
-  overflow: hidden !important;
-}
-
-.messages-header {
-  flex-shrink: 0 !important;
-  height: 60px !important;
-  background: white !important;
-  z-index: 10 !important;
-}
-
-.messages-list,
-.messages-container,
-[class*="messages-container"] {
-  flex: 1 !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+/* Messages page structure - RESPONSIVE DESKTOP/MOBILE */
+.messages-container {
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-y: contain !important;
-  padding: 10px !important;
-  padding-bottom: 90px !important;
   background: white !important;
-  display: flex !important;
-  flex-direction: column !important;
 }
 
-.message-input-container {
-  position: fixed !important;
-  bottom: 60px !important;
-  left: 0 !important;
-  right: 0 !important;
-  background: white !important;
-  padding: 10px !important;
-  z-index: 100 !important;
-  border-top: 1px solid #ddd !important;
+/* Desktop: normal layout */
+@media (min-width: 769px) {
+  .messages-container {
+    overflow-y: auto !important;
+    padding: 16px !important;
+  }
+
+  .message-input-container {
+    position: relative !important;
+    background: white !important;
+    padding: 16px !important;
+    border-top: 1px solid #e5e7eb !important;
+  }
+}
+
+/* Mobile: fixed input at bottom */
+@media (max-width: 768px) {
+  /* Force white background on messages page to hide pink */
+  body:has([class*="messages"]) {
+    background: white !important;
+  }
+
+  html {
+    background: white !important;
+  }
+
+  .messages-container {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 10px !important;
+    padding-bottom: 80px !important;
+    height: calc(100vh - 140px) !important;
+    max-height: calc(100vh - 140px) !important;
+  }
+
+  .message-input-container {
+    position: fixed !important;
+    bottom: 60px !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: white !important;
+    padding: 10px !important;
+    z-index: 100 !important;
+    border-top: 1px solid #ddd !important;
+  }
 }
 
 /* Safe area inset support for mobile */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .messages-container,
-  [class*="messages-container"] {
-    padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important;
-  }
+  @media (max-width: 768px) {
+    .messages-container {
+      padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+      height: calc(100vh - 140px - env(safe-area-inset-bottom)) !important;
+    }
 
-  .message-input-container {
-    padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+    .message-input-container {
+      bottom: calc(60px + env(safe-area-inset-bottom)) !important;
+    }
   }
 }
 
@@ -511,19 +525,4 @@ button[class*="Buy for"] {
     border-radius: 0 !important;
   }
 
-  /* Messages container mobile fix */
-  .messages-container,
-  [class*="messages-container"] {
-    height: calc(100vh - 180px) !important;
-    max-height: calc(100vh - 180px) !important;
-  }
-
-  /* Adjust for safe area on mobile */
-  @supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .messages-container,
-    [class*="messages-container"] {
-      height: calc(100vh - 180px - env(safe-area-inset-bottom)) !important;
-      max-height: calc(100vh - 180px - env(safe-area-inset-bottom)) !important;
-    }
-  }
 }
