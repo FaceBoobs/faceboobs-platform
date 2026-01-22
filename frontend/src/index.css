@@ -337,7 +337,7 @@ body {
   -ms-user-select: none !important;
   user-select: none !important;
 
-  /* Prevent ALL pointer events on locked content */
+  /* Prevent ALL pointer events on locked content container */
   pointer-events: none !important;
 
   /* Prevent ALL dragging methods */
@@ -346,9 +346,14 @@ body {
   -moz-user-drag: none !important;
   -o-user-drag: none !important;
   user-drag: none !important;
+
+  /* Prevent long-press and touch events */
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  touch-action: none !important;
 }
 
-/* Images in premium content */
+/* Images in premium content - MAXIMUM PROTECTION */
 .premium-content img,
 .paid-content img,
 .locked-content img,
@@ -366,27 +371,40 @@ body {
   -moz-user-select: none !important;
   user-select: none !important;
 
-  /* Prevent context menu */
+  /* Prevent context menu and touch events */
   -webkit-touch-callout: none !important;
   pointer-events: none !important;
+  touch-action: none !important;
 }
 
-/* UNLOCK OVERLAY - Container for unlock button */
-.unlock-overlay {
+/* UNLOCK OVERLAY - Container for unlock button - MUST BE CLICKABLE */
+.unlock-overlay,
+.premium-content > div[class*="absolute"],
+[data-premium="true"] > div[class*="absolute"],
+[data-paid="true"] > div[class*="absolute"] {
   position: absolute !important;
   inset: 0 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   z-index: 50 !important;
-  pointer-events: none !important;
+  pointer-events: auto !important; /* MUST BE CLICKABLE */
+}
+
+/* Inner container for unlock button */
+.unlock-overlay > div,
+.premium-content > div[class*="absolute"] > div,
+[data-premium="true"] > div[class*="absolute"] > div,
+[data-paid="true"] > div[class*="absolute"] > div {
+  pointer-events: auto !important;
 }
 
 /* UNLOCK BUTTON - Must remain clickable with LARGE touch area! */
 .unlock-button,
 [data-unlock="true"],
 button[class*="unlock"],
-button[class*="purchase"] {
+button[class*="purchase"],
+button[class*="Buy for"] {
   /* Override pointer events - MUST be clickable */
   pointer-events: auto !important;
 
@@ -420,7 +438,15 @@ button[class*="purchase"] {
   height: 100vh !important;
   display: flex !important;
   flex-direction: column !important;
+  background: white !important;
   overflow: hidden !important;
+}
+
+.messages-header {
+  flex-shrink: 0 !important;
+  height: 60px !important;
+  background: white !important;
+  z-index: 10 !important;
 }
 
 .messages-list,
@@ -431,21 +457,22 @@ button[class*="purchase"] {
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-y: contain !important;
-  padding-bottom: 20px !important;
+  padding: 10px !important;
+  padding-bottom: 90px !important;
+  background: white !important;
   display: flex !important;
   flex-direction: column !important;
-  min-height: 100%;
 }
 
 .message-input-container {
-  position: sticky !important;
-  bottom: 0 !important;
+  position: fixed !important;
+  bottom: 60px !important;
   left: 0 !important;
   right: 0 !important;
   background: white !important;
   padding: 10px !important;
   z-index: 100 !important;
-  border-top: 1px solid #e5e7eb !important;
+  border-top: 1px solid #ddd !important;
 }
 
 /* Safe area inset support for mobile */

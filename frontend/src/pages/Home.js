@@ -631,17 +631,44 @@ const Home = () => {
               className="premium-content relative bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center w-full max-h-[500px] md:max-h-[900px]"
               data-premium="true"
               data-paid="true"
-              onContextMenu={(e) => e.preventDefault()}
+              onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); return false; }}
+              onTouchStart={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+              style={{
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none',
+                pointerEvents: 'none'
+              }}
             >
               <img
                 src={content.content}
                 alt="Preview"
                 className="w-full h-auto object-contain blur-lg max-h-[500px] md:max-h-[900px]"
-                draggable="false"
-                onContextMenu={(e) => e.preventDefault()}
+                draggable={false}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); return false; }}
+                onTouchStart={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()}
+                style={{
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
+                  pointerEvents: 'none'
+                }}
               />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center text-white bg-black bg-opacity-50 p-6 rounded-lg">
+              <div
+                className="absolute inset-0 flex items-center justify-center"
+                style={{
+                  pointerEvents: 'auto',
+                  zIndex: 50
+                }}
+              >
+                <div
+                  className="text-center text-white bg-black bg-opacity-50 p-6 rounded-lg"
+                  style={{
+                    pointerEvents: 'auto'
+                  }}
+                >
                   <Lock size={48} className="mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Premium Content</h3>
                   <p className="text-sm opacity-90 mb-4">
@@ -649,6 +676,7 @@ const Home = () => {
                   </p>
                   <button
                     onClick={handlePurchase}
+                    onTouchEnd={handlePurchase}
                     disabled={purchasing}
                     className="unlock-button bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 disabled:opacity-50 transition-colors"
                     data-unlock="true"
@@ -656,7 +684,11 @@ const Home = () => {
                       pointerEvents: 'auto',
                       zIndex: 9999,
                       position: 'relative',
-                      touchAction: 'manipulation'
+                      touchAction: 'manipulation',
+                      cursor: 'pointer',
+                      minHeight: '60px',
+                      minWidth: '200px',
+                      padding: '20px 40px'
                     }}
                   >
                     {purchasing ? 'Purchasing...' : `Buy for ${content.price} BNB`}

@@ -1029,8 +1029,8 @@ const Messages = () => {
   const showListView = isMobile ? !conversationId : true;
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="w-full md:max-w-6xl mx-auto bg-white md:rounded-xl md:shadow-sm md:border md:border-gray-200 overflow-hidden h-screen md:h-[600px] flex">
+    <div className="messages-page" style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'white' }}>
+      <div className="w-full md:max-w-6xl mx-auto bg-white md:rounded-xl md:shadow-sm md:border md:border-gray-200 overflow-hidden flex" style={{ height: '100%', flex: 1 }}>
 
       {/* Conversation List - Hidden on mobile when viewing chat */}
       <div className={`${showListView ? 'flex' : 'hidden'} ${isMobile ? 'w-full' : 'w-1/3'} border-r border-gray-200 flex-col`}>
@@ -1137,7 +1137,7 @@ const Messages = () => {
       <div className={`${showChatView ? 'flex' : 'hidden'} flex-1 flex-col`}>
         {activeChat ? (
           <>
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="messages-header p-4 border-b border-gray-200 flex items-center justify-between" style={{ flexShrink: 0, height: '60px', background: 'white', zIndex: 10 }}>
               <div className="flex items-center space-x-3">
                 {/* Back button for mobile */}
                 {isMobile && (
@@ -1174,15 +1174,16 @@ const Messages = () => {
             </div>
 
             <div
-              className="messages-container flex-1 overflow-y-auto p-4 bg-pink-50"
+              className="messages-container flex-1 overflow-y-auto p-4"
               style={{
-                height: 'calc(100vh - 200px)',
+                flex: 1,
                 overflowY: 'auto',
                 overflowX: 'hidden',
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehaviorY: 'contain',
-                minHeight: '100%',
-                paddingBottom: '20px',
+                padding: '10px',
+                paddingBottom: '90px',
+                background: 'white',
                 display: 'flex',
                 flexDirection: 'column'
               }}
@@ -1283,13 +1284,14 @@ const Messages = () => {
             <div
               className="message-input-container p-4 border-t border-gray-200"
               style={{
-                position: 'sticky',
-                bottom: 0,
+                position: 'fixed',
+                bottom: '60px',
                 left: 0,
                 right: 0,
                 background: 'white',
-                zIndex: 100,
-                borderTop: '1px solid #e5e7eb'
+                padding: '10px',
+                borderTop: '1px solid #ddd',
+                zIndex: 100
               }}
             >
               {/* Hidden file input */}
