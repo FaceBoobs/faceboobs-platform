@@ -296,19 +296,32 @@ const Home = () => {
   };
 
   const buyContent = async (contentId, price, blockchainContentId) => {
+    // Enhanced debug logging
     console.log('🛒 Starting content purchase...', {
       supabaseId: contentId,
       blockchainContentId,
-      price
+      price,
+      hasWallet: !!window.ethereum,
+      account: account,
+      hasContract: !!contract
     });
 
-    if (!contract) {
-      toast.error('Contract not available. Please connect your wallet.');
+    // Check wallet connection
+    if (!window.ethereum) {
+      console.error('❌ No wallet detected');
+      toast.error('Please install MetaMask to make purchases');
       return;
     }
 
     if (!account) {
-      toast.error('Please connect your wallet first.');
+      console.error('❌ No account connected');
+      toast.error('Please connect your wallet first');
+      return;
+    }
+
+    if (!contract) {
+      console.error('❌ Contract not available');
+      toast.error('Contract not available. Please connect your wallet.');
       return;
     }
 

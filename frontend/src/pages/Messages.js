@@ -1173,7 +1173,20 @@ const Messages = () => {
               </div>
             </div>
 
-            <div className="messages-container flex-1 overflow-y-auto p-4 bg-pink-50">
+            <div
+              className="messages-container flex-1 overflow-y-auto p-4 bg-pink-50"
+              style={{
+                height: 'calc(100vh - 200px)',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehaviorY: 'contain',
+                minHeight: '100%',
+                paddingBottom: '20px',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
               {console.log('💬 Total messages to render:', messages.length)}
               {messages.map((message, index) => {
                 const senderLower = message.sender_address?.toLowerCase();
@@ -1267,7 +1280,18 @@ const Messages = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="message-input-container p-4 border-t border-gray-200">
+            <div
+              className="message-input-container p-4 border-t border-gray-200"
+              style={{
+                position: 'sticky',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                background: 'white',
+                zIndex: 100,
+                borderTop: '1px solid #e5e7eb'
+              }}
+            >
               {/* Hidden file input */}
               <input
                 ref={fileInputRef}
