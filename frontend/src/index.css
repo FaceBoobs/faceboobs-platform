@@ -540,29 +540,20 @@ button[class*="purchase"],
   }
 }
 
-/* ===== MODAL STYLES ===== */
-/* Media upload modal - ensure proper visibility */
-.media-upload-modal-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  background-color: rgba(0, 0, 0, 0.75) !important;
-  backdrop-filter: blur(4px) !important;
-  z-index: 9999 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 1rem !important;
+/* ===== MODAL STYLES - CRITICAL Z-INDEX ===== */
+/* Ensure modals are always on top */
+[role="dialog"],
+.modal,
+.fixed.inset-0 {
+  z-index: 99999 !important;
 }
 
-.media-upload-modal-content {
-  background: white !important;
-  border-radius: 12px !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-  max-width: 600px !important;
-  width: 100% !important;
-  max-height: 90vh !important;
-  z-index: 10000 !important;
-  overflow: hidden !important;
+/* Ensure sidebar and other elements stay below modals */
+.messages-page-wrapper > div:first-child,
+[class*="conversation"],
+[class*="sidebar"],
+nav:not(.fixed) {
+  z-index: 1 !important;
 }
 
 /* ===== MOBILE RESPONSIVE ===== */
