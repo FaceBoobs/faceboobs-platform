@@ -1601,44 +1601,44 @@ const Messages = () => {
           }}
         >
           <div
-            className="bg-white rounded-2xl w-full overflow-hidden"
+            className="bg-white rounded-xl w-full overflow-hidden"
             style={{
-              maxWidth: '700px',
-              maxHeight: '90vh',
+              maxWidth: '500px',
+              maxHeight: '70vh',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)'
+              boxShadow: '0 20px 40px -12px rgba(0, 0, 0, 0.8)'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header - Simple */}
+            {/* Modal Header - Compact */}
             <div
-              className="flex items-center justify-between p-5 border-b border-gray-200"
+              className="flex items-center justify-between p-4 border-b border-gray-200"
               style={{ flexShrink: 0 }}
             >
-              <h2 className="text-2xl font-bold text-gray-900">Attach Media</h2>
+              <h2 className="text-lg font-bold text-gray-900">Attach Media</h2>
               <button
                 onClick={closeMediaModal}
-                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full p-2 transition-colors"
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full p-1.5 transition-colors"
                 disabled={uploadingMedia}
                 type="button"
               >
-                <X size={28} />
+                <X size={22} />
               </button>
             </div>
 
-            {/* Modal Body - Scrollable */}
+            {/* Modal Body - Compact */}
             <div
-              className="overflow-y-auto p-6"
+              className="overflow-y-auto p-4"
               style={{ flex: 1 }}
             >
-              {/* Media Preview - LARGE */}
+              {/* Media Preview - Compact */}
               <div
-                className="rounded-xl overflow-hidden bg-gray-900 flex items-center justify-center mb-6"
+                className="rounded-lg overflow-hidden bg-gray-900 flex items-center justify-center mb-4"
                 style={{
-                  minHeight: '400px',
-                  maxHeight: '500px',
-                  width: '100%'
+                  maxWidth: '250px',
+                  maxHeight: '250px',
+                  margin: '0 auto'
                 }}
               >
                 {mediaType === 'image' ? (
@@ -1646,9 +1646,10 @@ const Messages = () => {
                     src={previewUrl}
                     alt="Preview"
                     style={{
-                      width: '100%',
+                      maxWidth: '250px',
+                      maxHeight: '250px',
+                      width: 'auto',
                       height: 'auto',
-                      maxHeight: '500px',
                       objectFit: 'contain'
                     }}
                   />
@@ -1657,9 +1658,10 @@ const Messages = () => {
                     src={previewUrl}
                     controls
                     style={{
-                      width: '100%',
+                      maxWidth: '250px',
+                      maxHeight: '250px',
+                      width: 'auto',
                       height: 'auto',
-                      maxHeight: '500px',
                       objectFit: 'contain'
                     }}
                   />
@@ -1667,8 +1669,8 @@ const Messages = () => {
               </div>
 
               {/* Caption */}
-              <div className="mb-5">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Caption (optional)
                 </label>
                 <input
@@ -1676,37 +1678,37 @@ const Messages = () => {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Add a caption..."
-                  className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={uploadingMedia}
                 />
               </div>
 
               {/* Paid Content Toggle */}
-              <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="text-green-600" size={22} />
-                    <span className="text-base font-semibold text-gray-900">Paid Content</span>
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <DollarSign className="text-green-600" size={18} />
+                    <span className="text-sm font-semibold text-gray-900">Paid Content</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsPaidContent(!isPaidContent)}
-                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                       isPaidContent ? 'bg-green-600' : 'bg-gray-300'
                     }`}
                     disabled={uploadingMedia}
                   >
                     <span
-                      className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                        isPaidContent ? 'translate-x-7' : 'translate-x-1'
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        isPaidContent ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
                   </button>
                 </div>
 
                 {isPaidContent && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <div className="mt-2">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Price in BNB
                     </label>
                     <div className="flex items-center gap-2">
@@ -1717,33 +1719,33 @@ const Messages = () => {
                         value={contentPrice}
                         onChange={(e) => setContentPrice(e.target.value)}
                         placeholder="0.01"
-                        className="flex-1 px-4 py-2.5 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         disabled={uploadingMedia}
                       />
-                      <span className="text-sm font-semibold text-gray-600 px-3">BNB</span>
+                      <span className="text-xs font-semibold text-gray-600">BNB</span>
                     </div>
-                    <p className="mt-2 text-xs text-gray-500">
-                      🔒 Will be registered on blockchain
+                    <p className="mt-1 text-xs text-gray-500">
+                      🔒 Blockchain registration
                     </p>
                   </div>
                 )}
 
                 {!isPaidContent && (
-                  <p className="text-sm text-gray-600">
-                    ✅ Free content, visible immediately
+                  <p className="text-xs text-gray-600">
+                    ✅ Free content
                   </p>
                 )}
               </div>
             </div>
 
-            {/* Modal Footer */}
+            {/* Modal Footer - Compact */}
             <div
-              className="flex items-center gap-3 p-5 border-t border-gray-200 bg-white"
+              className="flex items-center gap-2 p-3 border-t border-gray-200 bg-white"
               style={{ flexShrink: 0 }}
             >
               <button
                 onClick={closeMediaModal}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
                 disabled={uploadingMedia}
                 type="button"
               >
@@ -1752,17 +1754,17 @@ const Messages = () => {
               <button
                 onClick={handleSendMedia}
                 disabled={uploadingMedia || (isPaidContent && (!contentPrice || parseFloat(contentPrice) <= 0))}
-                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 font-semibold"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 text-sm font-semibold"
                 type="button"
               >
                 {uploadingMedia ? (
                   <>
-                    <Loader className="animate-spin" size={18} />
-                    <span>{isPaidContent ? 'Uploading...' : 'Uploading...'}</span>
+                    <Loader className="animate-spin" size={16} />
+                    <span>Uploading...</span>
                   </>
                 ) : (
                   <>
-                    <Send size={18} />
+                    <Send size={16} />
                     <span>Send</span>
                   </>
                 )}
