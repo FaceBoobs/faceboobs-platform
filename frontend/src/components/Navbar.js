@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, Home, MessageCircle, User, PlusSquare, DollarSign, LogOut, Menu, X, Bell } from 'lucide-react';
-import NotificationDropdown from './NotificationDropdown';
 import { SupabaseService } from '../services/supabaseService';
 import { useWeb3 } from '../contexts/Web3Context';
+import { useNotifications } from '../contexts/NotificationsContext';
 
 const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loading }) => {
   const { getMediaUrl } = useWeb3();
+  const { unreadCount: unreadNotificationsCount } = useNotifications();
   const location = useLocation();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -141,13 +142,22 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
             })}
 
             {/* Notifications Item */}
-            <div className="relative flex items-center gap-3 px-4 py-3 rounded-2xl text-gray-700 hover:text-pink-400 transition-all">
-              <NotificationDropdown
-                iconSize={22}
-                className="relative"
-              />
-              <span className="text-sm cursor-pointer" onClick={() => navigate('/notifications')}>Notifications</span>
-            </div>
+            <Link
+              to="/notifications"
+              className={`relative flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
+                location.pathname === '/notifications'
+                  ? 'bg-white text-pink-500 font-bold shadow-sm'
+                  : 'text-gray-700 hover:text-pink-400'
+              }`}
+            >
+              <Bell size={22} />
+              <span className="text-sm">Notifications</span>
+              {unreadNotificationsCount > 0 && (
+                <div className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1">
+                  {unreadNotificationsCount > 99 ? '99' : unreadNotificationsCount}
+                </div>
+              )}
+            </Link>
           </div>
         )}
 
@@ -325,6 +335,11 @@ const Navbar = ({ user, account, onConnect, onDisconnect, onBecomeCreator, loadi
                 >
                   <Bell size={22} />
                   <span>Notifications</span>
+                  {unreadNotificationsCount > 0 && (
+                    <div className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1">
+                      {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                    </div>
+                  )}
                 </Link>
               </div>
 

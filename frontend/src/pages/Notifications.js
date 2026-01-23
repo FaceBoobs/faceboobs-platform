@@ -4,78 +4,41 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, UserPlus, Mail, Check, CheckCheck, Bell } from 'lucide-react';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
-import {
-  getNotifications,
-  markNotificationAsRead,
-  markAllNotificationsAsRead
-} from '../services/notificationService';
+import { useNotifications } from '../contexts/NotificationsContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const Notifications = () => {
   const { account, user, loading: web3Loading } = useWeb3();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    notifications: allNotifications,
+    unreadCount,
+    loading,
+    markAsRead,
+    markAllAsRead
+  } = useNotifications();
   const [markingAll, setMarkingAll] = useState(false);
 
+  // Filter to show only unread notifications
+  const [notifications, setNotifications] = useState([]);
+
   useEffect(() => {
-    if (account) {
-      loadNotifications();
-    }
-  }, [account]);
-
-  const loadNotifications = async () => {
-    try {
-      setLoading(true);
-      console.log('📬 Loading notifications for:', account);
-
-      const result = await getNotifications(account);
-
-      if (result.success) {
-        console.log('✅ Notifications loaded:', result.data.length);
-        setNotifications(result.data);
-
-        // Auto-mark notifications as read after 2 seconds
-        setTimeout(() => {
-          result.data.forEach(notif => {
-            if (!notif.is_read) {
-              markNotificationAsRead(notif.id);
-            }
-          });
-
-          // Update local state to reflect read status
-          setNotifications(prev =>
-            prev.map(notif => ({ ...notif, is_read: true }))
-          );
-        }, 2000);
-      } else {
-        console.error('❌ Failed to load notifications:', result.error);
-        toast.error('Failed to load notifications');
-      }
-    } catch (error) {
-      console.error('❌ Error loading notifications:', error);
-      toast.error('Error loading notifications');
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Show only unread notifications
+    const unreadNotifications = allNotifications.filter(notif => !notif.is_read);
+    console.log('📬 Showing unread notifications:', unreadNotifications.length);
+    setNotifications(unreadNotifications);
+  }, [allNotifications]);
 
   const handleMarkAllAsRead = async () => {
     try {
       setMarkingAll(true);
       console.log('✅ Marking all notifications as read');
 
-      const result = await markAllNotificationsAsRead(account);
-
-      if (result.success) {
-        setNotifications(prev =>
-          prev.map(notif => ({ ...notif, is_read: true }))
-        );
-        toast.success('All notifications marked as read');
-      } else {
-        toast.error('Failed to mark notifications as read');
-      }
+      await markAllAsRead();
+      toast.success('All notifications marked as read');
+      // Clear the list since all are now read
+      setNotifications([]);
     } catch (error) {
       console.error('❌ Error marking all as read:', error);
       toast.error('Error marking notifications as read');
@@ -84,16 +47,21 @@ const Notifications = () => {
     }
   };
 
-  const handleNotificationClick = (notification) => {
-    // Mark as read immediately
+  const handleNotificationClick = async (notification) => {
+    console.log('🔔 Notification clicked:', notification.id);
+
+    // Mark as read immediately in database
     if (!notification.is_read) {
-      markNotificationAsRead(notification.id);
-      setNotifications(prev =>
-        prev.map(notif =>
-          notif.id === notification.id ? { ...notif, is_read: true } : notif
-        )
-      );
+      console.log('✅ Marking notification as read:', notification.id);
+      await markAsRead(notification.id);
     }
+
+    // Remove notification from list (make it disappear)
+    setNotifications(prev =>
+      prev.filter(notif => notif.id !== notification.id)
+    );
+
+    console.log('✅ Notification removed from list');
 
     // Navigate based on notification type
     switch (notification.type) {
@@ -162,8 +130,6 @@ const Notifications = () => {
       </div>
     );
   }
-
-  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
     <div className="max-w-2xl mx-auto">
