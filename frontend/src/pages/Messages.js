@@ -847,10 +847,42 @@ const Messages = () => {
       const signerAddress = await signer.getAddress();
 
       console.log('✅ Signer created:', signerAddress);
-      console.log('📝 Creating contract instance...');
+
+      // Get network info
+      const network = await provider.getNetwork();
+      console.log('🌐 Network info:', {
+        chainId: network.chainId.toString(),
+        name: network.name
+      });
+
+      console.log('📝 Creating contract instance with:', {
+        contractAddress: CONTRACT_ADDRESS,
+        hasABI: !!CONTRACT_ABI.abi,
+        abiLength: CONTRACT_ABI.abi?.length
+      });
+
+      // Verify contract exists
+      console.log('🔍 Checking if contract exists at address...');
+      const code = await provider.getCode(CONTRACT_ADDRESS);
+      console.log('📜 Contract code length:', code.length);
+
+      if (code === '0x' || code.length <= 2) {
+        console.error('❌ NO CONTRACT DEPLOYED at address:', CONTRACT_ADDRESS);
+        throw new Error(`Smart contract not found at ${CONTRACT_ADDRESS}. The contract may not be deployed on this network (chainId: ${network.chainId}).`);
+      }
+      console.log('✅ Contract exists at address');
 
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, signer);
       console.log('✅ Contract instance created');
+
+      // Verify buyContent function exists
+      console.log('🔍 Verifying buyContent function exists...');
+      if (typeof contract.buyContent !== 'function') {
+        console.error('❌ buyContent function not found in contract!');
+        console.log('Available functions:', Object.keys(contract.interface.functions));
+        throw new Error('Contract does not have buyContent function. Contract may be outdated or incorrect.');
+      }
+      console.log('✅ buyContent function exists');
 
       // Convert price to wei
       let priceInWei;
@@ -858,34 +890,88 @@ const Messages = () => {
         priceInWei = ethers.parseEther(message.price.toString());
         console.log('💰 Price conversion successful:', {
           priceInBNB: message.price,
-          priceInWei: priceInWei.toString()
+          priceInWei: priceInWei.toString(),
+          priceInHex: '0x' + priceInWei.toString(16)
         });
       } catch (priceError) {
         console.error('❌ Failed to convert price to wei:', priceError);
         throw new Error(`Invalid price format: ${message.price}`);
       }
 
-      console.log('📞 Calling contract.buyContent with:', {
-        contentId: message.blockchain_content_id,
-        priceInWei: priceInWei.toString(),
-        from: signerAddress
+      // Get balance
+      const balance = await provider.getBalance(signerAddress);
+      console.log('💰 Wallet balance:', {
+        balance: ethers.formatEther(balance),
+        required: ethers.formatEther(priceInWei),
+        hasEnough: balance >= priceInWei
       });
+
+      if (balance < priceInWei) {
+        throw new Error(`Insufficient balance. You have ${ethers.formatEther(balance)} BNB but need ${ethers.formatEther(priceInWei)} BNB`);
+      }
+
+      console.log('📞 Preparing contract call with parameters:', {
+        function: 'buyContent',
+        contentId: message.blockchain_content_id,
+        contentIdType: typeof message.blockchain_content_id,
+        priceInWei: priceInWei.toString(),
+        from: signerAddress,
+        contractAddress: CONTRACT_ADDRESS
+      });
+
+      // Estimate gas first
+      console.log('⚡ Estimating gas...');
+      let gasEstimate;
+      try {
+        gasEstimate = await contract.buyContent.estimateGas(
+          message.blockchain_content_id,
+          { value: priceInWei }
+        );
+        console.log('✅ Gas estimation successful:', gasEstimate.toString());
+      } catch (gasError) {
+        console.error('❌ Gas estimation failed:', {
+          error: gasError,
+          message: gasError.message,
+          code: gasError.code,
+          data: gasError.data,
+          reason: gasError.reason
+        });
+
+        // Provide user-friendly error message
+        if (gasError.message?.includes('Content does not exist')) {
+          throw new Error('This content does not exist on the blockchain. It may have been deleted or the blockchain ID is invalid.');
+        } else if (gasError.message?.includes('Already purchased')) {
+          throw new Error('You have already purchased this content.');
+        } else if (gasError.message?.includes('revert')) {
+          throw new Error(`Smart contract rejected the transaction: ${gasError.reason || gasError.message}`);
+        } else {
+          throw new Error(`Gas estimation failed: ${gasError.message}. The transaction will likely fail. Please check the content and try again.`);
+        }
+      }
 
       toast.info('Please confirm the transaction in MetaMask...');
 
       // Call buyContent on smart contract
+      console.log('📤 Sending transaction...');
       let tx;
       try {
         tx = await contract.buyContent(message.blockchain_content_id, {
-          value: priceInWei
+          value: priceInWei,
+          gasLimit: gasEstimate * 120n / 100n // Add 20% buffer
         });
-        console.log('✅ Transaction sent successfully:', tx.hash);
+        console.log('✅ Transaction sent successfully:', {
+          hash: tx.hash,
+          from: tx.from,
+          to: tx.to,
+          value: tx.value.toString()
+        });
       } catch (txError) {
         console.error('❌ Transaction failed:', {
           error: txError,
           message: txError.message,
           code: txError.code,
-          data: txError.data
+          data: txError.data,
+          reason: txError.reason
         });
         throw txError;
       }
@@ -949,30 +1035,55 @@ const Messages = () => {
         message: error.message,
         code: error.code,
         data: error.data,
+        reason: error.reason,
+        action: error.action,
         stack: error.stack
       });
 
-      // Enhanced error handling
+      // Enhanced error handling with specific messages
+      let userMessage = 'Failed to unlock content';
+
       if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
         console.log('❌ User rejected transaction');
-        toast.error('Transaction cancelled by user');
-      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.message?.includes('insufficient funds')) {
+        userMessage = 'Transaction cancelled';
+      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.message?.includes('insufficient funds') || error.message?.includes('Insufficient balance')) {
         console.log('❌ Insufficient funds');
-        toast.error('Insufficient BNB in your wallet');
+        userMessage = error.message?.includes('Insufficient balance')
+          ? error.message
+          : 'Insufficient BNB in your wallet';
       } else if (error.message?.includes('Already purchased') || error.code === '23505') {
         console.log('⚠️ Already purchased');
-        toast.info('You already own this content');
+        userMessage = 'You already own this content';
+        toast.info(userMessage);
         await loadMessages(activeChat.address);
+        return; // Exit early, not an error
+      } else if (error.message?.includes('Smart contract not found') || error.message?.includes('NO CONTRACT DEPLOYED')) {
+        console.log('❌ Contract not deployed');
+        userMessage = 'Smart contract not deployed on this network. Please switch to BSC Testnet.';
       } else if (error.message?.includes('Content does not exist')) {
         console.log('❌ Content not found on blockchain');
-        toast.error('Content not found on blockchain - invalid blockchain ID');
-      } else if (error.message?.includes('Not creator')) {
-        console.log('❌ Not creator error');
-        toast.error('This content was not properly registered on blockchain');
+        userMessage = 'This content does not exist on the blockchain';
+      } else if (error.message?.includes('buyContent function not found') || error.message?.includes('Contract may be outdated')) {
+        console.log('❌ Contract outdated');
+        userMessage = 'Smart contract is outdated or incorrect';
+      } else if (error.message?.includes('Gas estimation failed') || error.code === 'CALL_EXCEPTION') {
+        console.log('❌ Gas estimation failed / Call exception');
+        if (error.reason) {
+          userMessage = `Contract error: ${error.reason}`;
+        } else if (error.message?.includes('missing revert data')) {
+          userMessage = 'Smart contract call failed. The contract may not be deployed or the content may not exist on blockchain.';
+        } else {
+          userMessage = 'Transaction will likely fail. Please verify the content is properly registered on blockchain.';
+        }
+      } else if (error.message?.includes('network')) {
+        console.log('❌ Network error');
+        userMessage = 'Network error. Please check your connection and try again.';
       } else {
         console.log('❌ Unknown error');
-        toast.error(`Failed to unlock: ${error.message || 'Unknown error'}`);
+        userMessage = error.message || 'Unknown error occurred';
       }
+
+      toast.error(userMessage);
       console.error('❌ ========== ERROR END ==========');
     } finally {
       setUnlockingMedia(prev => ({ ...prev, [message.id]: false }));

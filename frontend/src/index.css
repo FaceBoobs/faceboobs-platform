@@ -509,7 +509,7 @@ button[class*="purchase"],
     overflow-y: auto !important;
     overflow-x: hidden !important;
     padding: 10px !important;
-    padding-bottom: 140px !important; /* Adjusted to 140px for optimal spacing */
+    padding-bottom: 150px !important; /* Increased to 150px to prevent messages being cut by input bar */
     height: calc(100vh - 140px) !important;
     max-height: calc(100vh - 140px) !important;
   }
@@ -530,7 +530,7 @@ button[class*="purchase"],
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   @media (max-width: 768px) {
     .messages-container {
-      padding-bottom: calc(140px + env(safe-area-inset-bottom)) !important;
+      padding-bottom: calc(150px + env(safe-area-inset-bottom)) !important;
       height: calc(100vh - 140px - env(safe-area-inset-bottom)) !important;
     }
 
