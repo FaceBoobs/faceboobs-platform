@@ -428,22 +428,24 @@ button[class*="purchase"],
   justify-content: center !important;
 }
 
-/* Responsive button sizing */
+/* Responsive button sizing - MORE COMPACT */
 @media (max-width: 768px) {
   .unlock-button-responsive {
-    min-height: 44px !important;
-    min-width: 140px !important;
-    padding: 10px 20px !important;
-    font-size: 14px !important;
+    min-height: 36px !important;      /* Reduced from 44px */
+    max-width: 160px !important;       /* Added max-width */
+    padding: 8px 16px !important;      /* Reduced from 10px 20px */
+    font-size: 13px !important;        /* Reduced from 14px */
+    line-height: 1.2 !important;
   }
 }
 
 @media (min-width: 769px) {
   .unlock-button,
   .unlock-button-responsive {
-    min-height: 48px !important;
-    min-width: 180px !important;
-    padding: 12px 32px !important;
+    min-height: 44px !important;       /* Slightly reduced */
+    min-width: 160px !important;       /* Reduced from 180px */
+    padding: 10px 24px !important;     /* Reduced from 12px 32px */
+    font-size: 14px !important;
   }
 }
 
@@ -507,7 +509,7 @@ button[class*="purchase"],
     overflow-y: auto !important;
     overflow-x: hidden !important;
     padding: 10px !important;
-    padding-bottom: 120px !important; /* Increased from 80px to prevent photos being cut */
+    padding-bottom: 160px !important; /* Increased to 160px to show last message completely */
     height: calc(100vh - 140px) !important;
     max-height: calc(100vh - 140px) !important;
   }
@@ -528,7 +530,7 @@ button[class*="purchase"],
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   @media (max-width: 768px) {
     .messages-container {
-      padding-bottom: calc(120px + env(safe-area-inset-bottom)) !important;
+      padding-bottom: calc(160px + env(safe-area-inset-bottom)) !important;
       height: calc(100vh - 140px - env(safe-area-inset-bottom)) !important;
     }
 

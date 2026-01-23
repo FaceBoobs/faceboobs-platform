@@ -775,22 +775,46 @@ const Messages = () => {
 
   // Unlock paid media content
   const handleUnlockMedia = async (message) => {
-    console.log('🔵 handleUnlockMedia called!', {
+    console.log('🔵 ========== UNLOCK MEDIA DEBUG ==========');
+    console.log('🔵 handleUnlockMedia called with message:', {
       messageId: message?.id,
-      hasBlockchainId: !!message?.blockchain_content_id,
-      price: message?.price
+      blockchain_content_id: message?.blockchain_content_id,
+      price: message?.price,
+      media_type: message?.media_type,
+      media_url: message?.media_url,
+      is_paid: message?.is_paid,
+      is_unlocked: message?.is_unlocked,
+      sender_address: message?.sender_address,
+      fullMessage: message
     });
 
-    if (!message || !message.blockchain_content_id) {
-      console.error('❌ Invalid message or missing blockchain_content_id');
-      toast.error('Invalid content - missing blockchain ID');
+    // Validation with detailed logging
+    if (!message) {
+      console.error('❌ No message object provided');
+      toast.error('Invalid message object');
+      return;
+    }
+
+    if (!message.blockchain_content_id) {
+      console.error('❌ Missing blockchain_content_id', {
+        messageId: message.id,
+        isPaid: message.is_paid,
+        createdAt: message.created_at
+      });
+      toast.error('This content cannot be unlocked - it was not registered on blockchain. Please ask the sender to resend it.');
+      return;
+    }
+
+    if (!message.price || parseFloat(message.price) <= 0) {
+      console.error('❌ Invalid price', { price: message.price });
+      toast.error('Invalid content price');
       return;
     }
 
     // Confirm purchase
     console.log('📱 Showing confirmation dialog...');
     const confirmed = window.confirm(
-      `Unlock this ${message.media_type} for ${message.price} BNB?`
+      `Unlock this ${message.media_type || 'content'} for ${message.price} BNB?`
     );
 
     if (!confirmed) {
@@ -802,83 +826,154 @@ const Messages = () => {
 
     try {
       setUnlockingMedia(prev => ({ ...prev, [message.id]: true }));
+
       console.log('🔓 Starting unlock process:', {
         messageId: message.id,
         blockchainContentId: message.blockchain_content_id,
         price: message.price,
         hasMetaMask: !!window.ethereum,
-        account: account
+        account: account,
+        contractAddress: CONTRACT_ADDRESS
       });
 
       if (!window.ethereum) {
+        console.error('❌ MetaMask not installed');
         throw new Error('MetaMask not installed');
       }
 
+      console.log('🦊 Creating provider and signer...');
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
+      const signerAddress = await signer.getAddress();
+
+      console.log('✅ Signer created:', signerAddress);
+      console.log('📝 Creating contract instance...');
+
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, signer);
+      console.log('✅ Contract instance created');
 
       // Convert price to wei
-      const priceInWei = ethers.parseEther(message.price.toString());
+      let priceInWei;
+      try {
+        priceInWei = ethers.parseEther(message.price.toString());
+        console.log('💰 Price conversion successful:', {
+          priceInBNB: message.price,
+          priceInWei: priceInWei.toString()
+        });
+      } catch (priceError) {
+        console.error('❌ Failed to convert price to wei:', priceError);
+        throw new Error(`Invalid price format: ${message.price}`);
+      }
 
-      console.log('💰 Purchasing content:', {
+      console.log('📞 Calling contract.buyContent with:', {
         contentId: message.blockchain_content_id,
-        priceInWei: priceInWei.toString()
+        priceInWei: priceInWei.toString(),
+        from: signerAddress
       });
 
       toast.info('Please confirm the transaction in MetaMask...');
 
       // Call buyContent on smart contract
-      const tx = await contract.buyContent(message.blockchain_content_id, {
-        value: priceInWei
-      });
+      let tx;
+      try {
+        tx = await contract.buyContent(message.blockchain_content_id, {
+          value: priceInWei
+        });
+        console.log('✅ Transaction sent successfully:', tx.hash);
+      } catch (txError) {
+        console.error('❌ Transaction failed:', {
+          error: txError,
+          message: txError.message,
+          code: txError.code,
+          data: txError.data
+        });
+        throw txError;
+      }
 
-      console.log('⏳ Transaction sent:', tx.hash);
-      toast.info('Processing payment on blockchain...');
+      toast.info('⏳ Processing payment on blockchain...');
 
+      console.log('⏳ Waiting for transaction confirmation...');
       const receipt = await tx.wait();
-      console.log('✅ Transaction confirmed:', receipt);
+      console.log('✅ Transaction confirmed:', {
+        hash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        status: receipt.status
+      });
 
       // Save purchase in database
       console.log('💾 Saving purchase to database...');
-      const { error: purchaseError } = await supabase
+      const purchaseData = {
+        message_id: message.id,
+        buyer_address: account.toLowerCase(),
+        amount: message.price,
+        transaction_hash: tx.hash
+      };
+      console.log('💾 Purchase data:', purchaseData);
+
+      const { data: purchaseResult, error: purchaseError } = await supabase
         .from('message_purchases')
-        .insert([{
-          message_id: message.id,
-          buyer_address: account.toLowerCase(),
-          amount: message.price,
-          transaction_hash: tx.hash
-        }]);
+        .insert([purchaseData]);
 
       if (purchaseError) {
+        console.error('❌ Database insert error:', {
+          error: purchaseError,
+          code: purchaseError.code,
+          message: purchaseError.message,
+          details: purchaseError.details
+        });
+
         // Check if error is due to duplicate (already purchased)
         if (purchaseError.code === '23505') {
-          console.log('⚠️ Already purchased, reloading messages...');
+          console.log('⚠️ Duplicate purchase entry (already purchased), continuing...');
         } else {
-          console.error('❌ Purchase record error:', purchaseError);
+          console.error('❌ Failed to save purchase record');
           throw purchaseError;
         }
+      } else {
+        console.log('✅ Purchase recorded successfully:', purchaseResult);
       }
 
-      console.log('✅ Purchase recorded successfully');
       toast.success('Content unlocked! 🎉');
+      console.log('🔄 Reloading messages to show unlocked content...');
 
       // Reload messages to show unlocked content
       await loadMessages(activeChat.address);
+      console.log('✅ Messages reloaded successfully');
+      console.log('🔵 ========== UNLOCK COMPLETE ==========');
 
     } catch (error) {
-      console.error('❌ Unlock error:', error);
+      console.error('❌ ========== UNLOCK ERROR ==========');
+      console.error('❌ Error details:', {
+        error: error,
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        data: error.data,
+        stack: error.stack
+      });
 
+      // Enhanced error handling
       if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
-        toast.error('Transaction cancelled');
+        console.log('❌ User rejected transaction');
+        toast.error('Transaction cancelled by user');
       } else if (error.code === 'INSUFFICIENT_FUNDS' || error.message?.includes('insufficient funds')) {
-        toast.error('Insufficient funds in your wallet');
+        console.log('❌ Insufficient funds');
+        toast.error('Insufficient BNB in your wallet');
       } else if (error.message?.includes('Already purchased') || error.code === '23505') {
+        console.log('⚠️ Already purchased');
         toast.info('You already own this content');
         await loadMessages(activeChat.address);
+      } else if (error.message?.includes('Content does not exist')) {
+        console.log('❌ Content not found on blockchain');
+        toast.error('Content not found on blockchain - invalid blockchain ID');
+      } else if (error.message?.includes('Not creator')) {
+        console.log('❌ Not creator error');
+        toast.error('This content was not properly registered on blockchain');
       } else {
-        toast.error(error.message || 'Failed to unlock content');
+        console.log('❌ Unknown error');
+        toast.error(`Failed to unlock: ${error.message || 'Unknown error'}`);
       }
+      console.error('❌ ========== ERROR END ==========');
     } finally {
       setUnlockingMedia(prev => ({ ...prev, [message.id]: false }));
     }
@@ -1264,7 +1359,7 @@ const Messages = () => {
                                 touchAction: 'manipulation'
                               }}
                             >
-                              <Lock className="text-white mb-2" size={24} />
+                              <Lock className="text-white mb-1" size={20} />
                               <button
                                 onClick={() => handleUnlockMedia(message)}
                                 onTouchEnd={(e) => {
@@ -1272,7 +1367,7 @@ const Messages = () => {
                                   e.stopPropagation();
                                   handleUnlockMedia(message);
                                 }}
-                                className="unlock-button-responsive bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors mt-2 text-sm md:text-base"
+                                className="unlock-button-responsive bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors mt-1"
                                 style={{
                                   touchAction: 'manipulation',
                                   cursor: 'pointer',
@@ -1280,7 +1375,7 @@ const Messages = () => {
                                   pointerEvents: 'auto'
                                 }}
                               >
-                                Unlock for {message.price} BNB
+                                Unlock {message.price} BNB
                               </button>
                             </div>
                           </div>
