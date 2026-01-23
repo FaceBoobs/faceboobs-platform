@@ -3,6 +3,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 
+// MOBILE MAINTENANCE MODE - Set to false to disable
+const MOBILE_MAINTENANCE_MODE = true;
+const MAINTENANCE_PASSWORD = 'vinciamolacompetizione';
+
 // Context
 import { Web3Provider, useWeb3 } from './contexts/Web3Context';
 import { NotificationsProvider } from './contexts/NotificationsContext';
@@ -49,6 +53,46 @@ function AppContent() {
 
   const [showLoginModal, setShowLoginModal] = React.useState(false);
   const [showCreatorSuccessModal, setShowCreatorSuccessModal] = React.useState(false);
+
+  // MOBILE MAINTENANCE MODE STATE
+  const [maintenancePassword, setMaintenancePassword] = React.useState('');
+  const [maintenanceError, setMaintenanceError] = React.useState('');
+  const [failedAttempts, setFailedAttempts] = React.useState(() => {
+    return parseInt(localStorage.getItem('maintenance_failed_attempts') || '0');
+  });
+
+  // Check if user is on mobile
+  const isMobile = React.useMemo(() => {
+    return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  }, []);
+
+  // Check if user has maintenance access
+  const hasMaintenanceAccess = React.useMemo(() => {
+    return sessionStorage.getItem('maintenance_access') === 'true';
+  }, [maintenancePassword]); // Re-check when password changes
+
+  // Handle maintenance password submission
+  const handleMaintenanceSubmit = (e) => {
+    e.preventDefault();
+
+    if (maintenancePassword === MAINTENANCE_PASSWORD) {
+      // Correct password
+      sessionStorage.setItem('maintenance_access', 'true');
+      localStorage.setItem('maintenance_failed_attempts', '0');
+      setMaintenanceError('');
+      setFailedAttempts(0);
+      // Force re-render by changing password state
+      setMaintenancePassword('');
+      window.location.reload(); // Reload to apply access
+    } else {
+      // Wrong password
+      const newFailedAttempts = failedAttempts + 1;
+      setFailedAttempts(newFailedAttempts);
+      localStorage.setItem('maintenance_failed_attempts', newFailedAttempts.toString());
+      setMaintenanceError('Wrong password');
+      setMaintenancePassword('');
+    }
+  };
 
   // CRITICAL SECURITY: Global event blocking for premium content
   React.useEffect(() => {
@@ -262,6 +306,75 @@ function AppContent() {
       toast.error(errorMessage);
     }
   };
+
+  // MOBILE MAINTENANCE MODE CHECK
+  if (MOBILE_MAINTENANCE_MODE && isMobile && !hasMaintenanceAccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-pink-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+          {/* Emoji and Title */}
+          <div className="text-center mb-6">
+            <div className="text-6xl mb-4">🔧</div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">
+              Mobile Maintenance
+            </h1>
+            <p className="text-gray-600">
+              We're fixing some bugs on mobile. Back soon!
+            </p>
+          </div>
+
+          {/* Show password field only if less than 3 failed attempts */}
+          {failedAttempts < 3 ? (
+            <form onSubmit={handleMaintenanceSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="maintenance-password" className="block text-sm font-medium text-gray-700 mb-2">
+                  Developer Access
+                </label>
+                <input
+                  type="password"
+                  id="maintenance-password"
+                  value={maintenancePassword}
+                  onChange={(e) => setMaintenancePassword(e.target.value)}
+                  placeholder="Enter password"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none transition-all"
+                  autoFocus
+                />
+              </div>
+
+              {maintenanceError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {maintenanceError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-500 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-600 transition-all duration-200 transform hover:scale-105"
+              >
+                Access
+              </button>
+
+              <p className="text-xs text-center text-gray-500 mt-2">
+                Attempts: {failedAttempts}/3
+              </p>
+            </form>
+          ) : (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm text-center">
+              <p className="font-semibold mb-1">Access Denied</p>
+              <p>Too many failed attempts. Please try again later.</p>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+            <p className="text-xs text-gray-500">
+              Desktop version is still available
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary>

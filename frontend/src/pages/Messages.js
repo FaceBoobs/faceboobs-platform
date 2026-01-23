@@ -905,20 +905,30 @@ const Messages = () => {
       console.log('🔍 Are they the same?', account?.toLowerCase() === signerAddress?.toLowerCase());
       console.log('🔍 Provider:', provider);
       console.log('🔍 Network chainId:', network.chainId.toString());
+      console.log('🔍 Expected chainId for BSC Testnet: 97');
+      console.log('🔍 Is on correct network?', network.chainId.toString() === '97');
 
       const balance = await provider.getBalance(signerAddress);
       const balanceInBNB = ethers.formatEther(balance);
       const priceInBNB = ethers.formatEther(priceInWei);
 
+      console.log('💰 ========== BALANCE INFO ==========');
+      console.log('💰 Balance:', balanceInBNB, 'BNB');
+      console.log('💰 Required:', priceInBNB, 'BNB');
+      console.log('💰 Wallet address:', signerAddress);
+      console.log('💰 ChainId:', network.chainId.toString());
+      console.log('💰 ========== RAW VALUES ==========');
       console.log('💰 Balance RAW (Wei):', balance.toString());
-      console.log('💰 Balance formatted (BNB):', balanceInBNB);
-      console.log('💰 Price required (BNB):', priceInBNB);
       console.log('💰 Price RAW (Wei):', priceInWei.toString());
+      console.log('💰 Balance type:', typeof balance);
+      console.log('💰 PriceInWei type:', typeof priceInWei);
       console.log('💰 Has enough balance?', balance >= priceInWei);
       console.log('💰 Balance comparison:', {
         balance: balance.toString(),
         priceInWei: priceInWei.toString(),
-        difference: (balance - priceInWei).toString()
+        difference: (balance - priceInWei).toString(),
+        balanceNumber: Number(balance),
+        priceNumber: Number(priceInWei)
       });
 
       // TEMPORARILY DISABLED - Balance check appears broken
@@ -971,10 +981,21 @@ const Messages = () => {
         }
       }
 
+      console.log('🔍 ========== PRE-TRANSACTION SUMMARY ==========');
+      console.log('📊 About to send transaction with:');
+      console.log('   - Content ID:', message.blockchain_content_id);
+      console.log('   - Price (BNB):', priceInBNB);
+      console.log('   - Price (Wei):', priceInWei.toString());
+      console.log('   - Your balance (BNB):', balanceInBNB);
+      console.log('   - Network:', network.chainId.toString(), network.name);
+      console.log('   - Contract:', CONTRACT_ADDRESS);
+      console.log('   - Gas estimate:', gasEstimate.toString());
+      console.log('🔍 ========================================');
+
       toast.info('Please confirm the transaction in MetaMask...');
 
       // Call buyContent on smart contract
-      console.log('📤 Sending transaction...');
+      console.log('📤 Sending transaction to blockchain...');
       let tx;
       try {
         tx = await contract.buyContent(message.blockchain_content_id, {
