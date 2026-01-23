@@ -509,7 +509,7 @@ button[class*="purchase"],
     overflow-y: auto !important;
     overflow-x: hidden !important;
     padding: 10px !important;
-    padding-bottom: 160px !important; /* Increased to 160px to show last message completely */
+    padding-bottom: 140px !important; /* Adjusted to 140px for optimal spacing */
     height: calc(100vh - 140px) !important;
     max-height: calc(100vh - 140px) !important;
   }
@@ -530,7 +530,7 @@ button[class*="purchase"],
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   @media (max-width: 768px) {
     .messages-container {
-      padding-bottom: calc(160px + env(safe-area-inset-bottom)) !important;
+      padding-bottom: calc(140px + env(safe-area-inset-bottom)) !important;
       height: calc(100vh - 140px - env(safe-area-inset-bottom)) !important;
     }
 
@@ -538,6 +538,31 @@ button[class*="purchase"],
       bottom: calc(60px + env(safe-area-inset-bottom)) !important;
     }
   }
+}
+
+/* ===== MODAL STYLES ===== */
+/* Media upload modal - ensure proper visibility */
+.media-upload-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background-color: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem !important;
+}
+
+.media-upload-modal-content {
+  background: white !important;
+  border-radius: 12px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  max-width: 600px !important;
+  width: 100% !important;
+  max-height: 90vh !important;
+  z-index: 10000 !important;
+  overflow: hidden !important;
 }
 
 /* ===== MOBILE RESPONSIVE ===== */

@@ -1585,102 +1585,128 @@ const Messages = () => {
         </div>
       )}
 
-      {/* Media Upload Modal - Compact Version */}
+      {/* Media Upload Modal - Fixed Version */}
       {showMediaModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999
+          }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               closeMediaModal();
             }
           }}
         >
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col" style={{ maxWidth: '500px' }}>
-            {/* Modal Header - Compact */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
+          <div
+            className="bg-white rounded-xl shadow-2xl w-full flex flex-col"
+            style={{
+              maxWidth: '600px',
+              maxHeight: '90vh',
+              zIndex: 10000
+            }}
+          >
+            {/* Modal Header - Improved */}
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-50 to-purple-50">
+              <div className="flex items-center gap-3">
                 {mediaType === 'image' ? (
-                  <ImageIcon className="text-blue-500" size={20} />
+                  <div className="bg-blue-500 p-2 rounded-lg">
+                    <ImageIcon className="text-white" size={24} />
+                  </div>
                 ) : (
-                  <Video className="text-blue-500" size={20} />
+                  <div className="bg-purple-500 p-2 rounded-lg">
+                    <Video className="text-white" size={24} />
+                  </div>
                 )}
-                <h2 className="text-lg font-bold text-gray-900">Attach Media</h2>
+                <h2 className="text-xl font-bold text-gray-900">Attach Media</h2>
               </div>
               <button
                 onClick={closeMediaModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 hover:text-gray-600 hover:bg-white rounded-full p-2 transition-all"
                 disabled={uploadingMedia}
                 title="Close without sending"
               >
-                <X size={20} />
+                <X size={24} />
               </button>
             </div>
 
-            {/* Modal Body - Compact */}
-            <div className="overflow-y-auto p-4 space-y-3">
-              {/* Media Preview - Compact 200x200 */}
+            {/* Modal Body - Responsive */}
+            <div className="overflow-y-auto p-6 space-y-4">
+              {/* Media Preview - Large and Responsive */}
               <div>
-                <div className="relative rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center" style={{ height: '200px' }}>
+                <div
+                  className="relative rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center"
+                  style={{
+                    minHeight: '300px',
+                    maxHeight: '450px'
+                  }}
+                >
                   {mediaType === 'image' ? (
                     <img
                       src={previewUrl}
                       alt="Preview"
-                      className="max-w-full max-h-[200px] object-contain"
+                      className="w-full h-auto object-contain"
+                      style={{ maxHeight: '450px' }}
                     />
                   ) : (
                     <video
                       src={previewUrl}
                       controls
-                      className="max-w-full max-h-[200px] object-contain"
+                      className="w-full h-auto object-contain"
+                      style={{ maxHeight: '450px' }}
                     />
                   )}
                 </div>
               </div>
 
-              {/* Caption - Compact */}
+              {/* Caption - Improved */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Caption (optional)
                 </label>
                 <input
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Add a caption..."
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Add a caption to your media..."
+                  className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                   disabled={uploadingMedia}
                 />
               </div>
 
-              {/* Paid Content Toggle - Compact */}
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="text-green-600" size={18} />
-                    <span className="text-sm font-medium text-gray-900">Paid Content</span>
+              {/* Paid Content Toggle - Improved */}
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-4 border-2 border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-500 p-2 rounded-lg">
+                      <DollarSign className="text-white" size={20} />
+                    </div>
+                    <span className="text-base font-semibold text-gray-900">Paid Content</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsPaidContent(!isPaidContent)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      isPaidContent ? 'bg-blue-600' : 'bg-gray-300'
+                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-all shadow-inner ${
+                      isPaidContent ? 'bg-green-600' : 'bg-gray-300'
                     }`}
                     disabled={uploadingMedia}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        isPaidContent ? 'translate-x-6' : 'translate-x-1'
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
+                        isPaidContent ? 'translate-x-8' : 'translate-x-1'
                       }`}
                     />
                   </button>
                 </div>
 
                 {isPaidContent && (
-                  <div className="mt-2">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <div className="mt-3 p-3 bg-white rounded-lg border-2 border-green-200">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Price in BNB
                     </label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <input
                         type="number"
                         step="0.001"
@@ -1688,30 +1714,32 @@ const Messages = () => {
                         value={contentPrice}
                         onChange={(e) => setContentPrice(e.target.value)}
                         placeholder="0.01"
-                        className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="flex-1 px-4 py-3 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
                         disabled={uploadingMedia}
                       />
-                      <span className="text-xs font-medium text-gray-600">BNB</span>
+                      <span className="text-base font-bold text-gray-700 bg-gray-100 px-3 py-3 rounded-lg">BNB</span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Registered on blockchain
+                    <p className="mt-2 text-sm text-green-700 flex items-center gap-2">
+                      <span className="text-lg">🔒</span>
+                      Will be registered on blockchain
                     </p>
                   </div>
                 )}
 
                 {!isPaidContent && (
-                  <p className="text-xs text-gray-600">
+                  <p className="text-sm text-gray-600 flex items-center gap-2">
+                    <span className="text-lg">✅</span>
                     Free content, visible immediately
                   </p>
                 )}
               </div>
             </div>
 
-            {/* Modal Footer - Compact with prominent Send button */}
-            <div className="p-4 border-t border-gray-200 flex items-center justify-between gap-3">
+            {/* Modal Footer - Improved */}
+            <div className="p-6 border-t-2 border-gray-200 flex items-center justify-between gap-4 bg-gray-50">
               <button
                 onClick={closeMediaModal}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white hover:border-gray-400 transition-all text-base font-medium shadow-sm"
                 disabled={uploadingMedia}
               >
                 Cancel
@@ -1719,17 +1747,17 @@ const Messages = () => {
               <button
                 onClick={handleSendMedia}
                 disabled={uploadingMedia || (isPaidContent && (!contentPrice || parseFloat(contentPrice) <= 0))}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-base font-semibold shadow-lg"
               >
                 {uploadingMedia ? (
                   <>
-                    <Loader className="animate-spin" size={18} />
-                    <span>{isPaidContent ? 'Sending...' : 'Uploading...'}</span>
+                    <Loader className="animate-spin" size={20} />
+                    <span>{isPaidContent ? 'Sending to Blockchain...' : 'Uploading...'}</span>
                   </>
                 ) : (
                   <>
-                    <Send size={18} />
-                    <span>Send</span>
+                    <Send size={20} />
+                    <span>Send Media</span>
                   </>
                 )}
               </button>
