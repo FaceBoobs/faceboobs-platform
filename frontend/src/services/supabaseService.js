@@ -329,15 +329,6 @@ export class SupabaseService {
       const { data, error } = await supabase
         .from('comments')
         .insert([commentData])
-        .select(`
-          *,
-          users (
-            username,
-            avatar_url,
-            wallet_address
-          )
-        `)
-        .single();
 
       if (error) throw error;
 
@@ -374,6 +365,7 @@ export class SupabaseService {
 
       const { data, error } = await supabase
         .from('comments')
+<<<<<<< HEAD
         .select(`
           *,
           users (
@@ -382,6 +374,9 @@ export class SupabaseService {
             wallet_address
           )
         `)
+=======
+        .select('*, users!comments_user_address_fkey(username, avatar_url, wallet_address)')
+>>>>>>> 7240662 (Fix: foreign key comments-users e join corretto)
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 
