@@ -168,8 +168,12 @@ export const Web3Provider = ({ children }) => {
 
   const initializeContract = async (web3Provider, userAccount) => {
     try {
+      console.log('🔧 ========== INITIALIZING CONTRACT ==========');
+      console.log('🔧 User account:', userAccount);
+
       const web3Signer = await web3Provider.getSigner();
       setSigner(web3Signer);
+      console.log('✅ Signer created');
 
       const contractInstance = new ethers.Contract(
         CONTRACT_ADDRESS,
@@ -179,16 +183,37 @@ export const Web3Provider = ({ children }) => {
 
       setContract(contractInstance);
       setContractError(null);
+      console.log('✅ Contract instance created');
 
       if (userAccount) {
-        // Auto-register user on blockchain if not already registered
+        console.log('🔄 Starting user initialization flow...');
+
+        // STEP 1: FIRST ensure user exists in Supabase with valid username
+        console.log('📝 Step 1: Check/Create user in Supabase...');
+        await checkOrCreateSupabaseUser(userAccount);
+        console.log('✅ Step 1 complete');
+
+        // STEP 2: THEN auto-register on blockchain (using Supabase data)
+        console.log('⛓️ Step 2: Auto-register on blockchain...');
         await autoRegisterOnBlockchain(contractInstance, userAccount);
+        console.log('✅ Step 2 complete');
+
+        // STEP 3: FINALLY load user data from Supabase
+        console.log('📊 Step 3: Load user data...');
         await loadUserData(userAccount);
+        console.log('✅ Step 3 complete');
+
+        console.log('🎉 User initialization complete!');
       }
 
       console.log('✅ Contract initialized successfully');
+      console.log('🔧 ========== INITIALIZATION COMPLETE ==========');
     } catch (error) {
-      console.error('❌ Contract initialization failed:', error);
+      console.error('❌ ========== CONTRACT INITIALIZATION ERROR ==========');
+      console.error('❌ Error:', error);
+      console.error('❌ Message:', error.message);
+      console.error('❌ Contract initialization failed');
+      console.error('❌ ========== ERROR END ==========');
       setContractError('Failed to initialize contract. Please check your connection.');
       setContract(null);
       setSigner(null);
@@ -197,57 +222,144 @@ export const Web3Provider = ({ children }) => {
 
   const autoRegisterOnBlockchain = async (contractInstance, userAddress) => {
     try {
+      console.log('🔍 ========== AUTO-REGISTER BLOCKCHAIN DEBUG ==========');
       console.log('🔍 Checking if user is registered on blockchain...');
+      console.log('🔍 User address:', userAddress);
+      console.log('🔍 Contract address:', CONTRACT_ADDRESS);
 
       // Check if user exists on blockchain using users mapping
       const userOnBlockchain = await contractInstance.users(userAddress);
       const isRegistered = userOnBlockchain.exists;
 
+      console.log('📊 Blockchain registration status:', {
+        exists: isRegistered,
+        username: userOnBlockchain.username || '(none)',
+        isCreator: userOnBlockchain.isCreator,
+        address: userAddress
+      });
+
       if (!isRegistered) {
-        console.log('📝 User not registered on blockchain, checking Supabase...');
+        console.log('📝 User NOT registered on blockchain, checking Supabase...');
 
         // Get user data from Supabase
         const { data: userData, success } = await SupabaseService.getUser(userAddress);
 
-        if (success && userData && userData.username) {
-          console.log('✅ User found in Supabase, auto-registering on blockchain...');
+        console.log('📊 Supabase user data:', {
+          success,
+          hasData: !!userData,
+          username: userData?.username || '(none)',
+          bio: userData?.bio || '(none)',
+          avatar_url: userData?.avatar_url || '(none)'
+        });
+
+        if (success && userData) {
+          // Generate default username if missing
+          let username = userData.username;
+          if (!username || username.trim() === '') {
+            username = `User_${userAddress.substring(0, 8)}`;
+            console.log('⚠️ No username in Supabase, using default:', username);
+          }
+
+          // Validate username is not empty
+          if (!username || username.trim() === '') {
+            console.error('❌ Cannot register: username is empty even after default generation');
+            return;
+          }
+
+          console.log('✅ Proceeding with blockchain registration...');
+          console.log('📋 Registration parameters:', {
+            username: username,
+            avatarHash: userData.avatar_url || 'QmDefaultAvatar',
+            bio: userData.bio || ''
+          });
 
           try {
             // Call registerUser with required parameters
             const tx = await contractInstance.registerUser(
-              userData.username,
+              username,
               userData.avatar_url || 'QmDefaultAvatar',
               userData.bio || ''
             );
             console.log('⏳ Registration transaction sent:', tx.hash);
-            await tx.wait();
-            console.log('✅ User registered on blockchain successfully');
+            console.log('⏳ Waiting for blockchain confirmation...');
+
+            const receipt = await tx.wait();
+            console.log('✅ Transaction confirmed:', {
+              hash: receipt.hash,
+              blockNumber: receipt.blockNumber,
+              status: receipt.status,
+              gasUsed: receipt.gasUsed?.toString()
+            });
+
+            console.log('✅ User registered on blockchain successfully!');
+
+            // Verify registration
+            const userAfterReg = await contractInstance.users(userAddress);
+            console.log('📊 Verification - User after registration:', {
+              exists: userAfterReg.exists,
+              username: userAfterReg.username,
+              isCreator: userAfterReg.isCreator
+            });
           } catch (regError) {
-            // Handle registration error
+            console.error('❌ ========== BLOCKCHAIN REGISTRATION ERROR ==========');
+            console.error('❌ Error details:', {
+              error: regError,
+              message: regError.message,
+              code: regError.code,
+              reason: regError.reason,
+              data: regError.data
+            });
+
+            // Handle specific error cases
             if (regError.message && regError.message.toLowerCase().includes('already registered')) {
-              console.log('ℹ️ User already registered on blockchain');
+              console.log('ℹ️ User already registered on blockchain (concurrent registration)');
+            } else if (regError.message && regError.message.toLowerCase().includes('username cannot be empty')) {
+              console.error('❌ CRITICAL: Username is empty! This should not happen.');
+            } else if (regError.code === 'ACTION_REJECTED' || regError.code === 4001) {
+              console.log('❌ User rejected the registration transaction');
             } else {
-              console.error('❌ Blockchain registration failed:', regError);
+              console.error('❌ Blockchain registration failed with unknown error');
             }
+            console.error('❌ ========== ERROR END ==========');
           }
         } else {
-          console.log('ℹ️ User not found in Supabase or incomplete profile, skipping blockchain registration');
+          console.log('⚠️ User not found in Supabase or failed to fetch data');
+          console.log('⚠️ Skipping blockchain registration - user needs to complete profile first');
         }
       } else {
         console.log('✅ User already registered on blockchain');
+        console.log('📊 Existing blockchain data:', {
+          username: userOnBlockchain.username,
+          isCreator: userOnBlockchain.isCreator,
+          followersCount: userOnBlockchain.followersCount?.toString(),
+          followingCount: userOnBlockchain.followingCount?.toString()
+        });
       }
+      console.log('🔍 ========== AUTO-REGISTER COMPLETE ==========');
     } catch (error) {
       // Don't block app loading if blockchain check fails
-      console.warn('⚠️ Blockchain registration check failed:', error);
+      console.error('⚠️ ========== AUTO-REGISTER FATAL ERROR ==========');
+      console.error('⚠️ Error:', error);
+      console.error('⚠️ Message:', error.message);
+      console.error('⚠️ Stack:', error.stack);
+      console.warn('⚠️ Blockchain registration check failed - app will continue without blockchain registration');
+      console.error('⚠️ ========== FATAL ERROR END ==========');
     }
   };
 
   const loadUserData = async (userAccount) => {
     try {
+      console.log('🔍 ========== LOADING USER DATA ==========');
       console.log('🔍 Loading user data from Supabase for:', userAccount);
 
       // Load user data from Supabase ONLY
       const { data: userData, success } = await SupabaseService.getUser(userAccount);
+
+      console.log('📊 Load user result:', {
+        success,
+        hasData: !!userData,
+        username: userData?.username || '(none)'
+      });
 
       if (success && userData) {
         // User exists in Supabase
@@ -263,31 +375,51 @@ export const Web3Provider = ({ children }) => {
         };
 
         setUser(userObj);
-        console.log('✅ User data loaded from Supabase');
+        console.log('✅ User data loaded from Supabase:', {
+          username: userObj.username,
+          isCreator: userObj.isCreator,
+          address: userObj.address
+        });
       } else {
-        // User doesn't exist in Supabase - create them automatically
-        console.log('ℹ️ User not found in Supabase, creating new record...');
-        await checkOrCreateSupabaseUser(userAccount);
-        setUser(null); // User is created but not registered yet
+        // User doesn't exist in Supabase - this should not happen if initializeContract ran correctly
+        console.warn('⚠️ User not found in Supabase after initialization!');
+        console.warn('⚠️ This indicates a problem with the initialization flow');
+        setUser(null);
       }
+      console.log('🔍 ========== LOAD USER DATA COMPLETE ==========');
     } catch (error) {
+      console.error('❌ ========== LOAD USER DATA ERROR ==========');
       console.error('❌ Error loading user data:', error);
+      console.error('❌ Message:', error.message);
+      console.error('❌ ========== ERROR END ==========');
       setUser(null);
     }
   };
 
   const checkOrCreateSupabaseUser = async (walletAddress) => {
     try {
+      console.log('🔍 ========== CHECK/CREATE SUPABASE USER DEBUG ==========');
       console.log('🔍 Checking if user exists in Supabase...');
+      console.log('🔍 Wallet address:', walletAddress);
 
-      const { data: existingUser } = await SupabaseService.getUser(walletAddress.toLowerCase());
+      const { data: existingUser, success: getUserSuccess } = await SupabaseService.getUser(walletAddress.toLowerCase());
+
+      console.log('📊 Supabase check result:', {
+        success: getUserSuccess,
+        userExists: !!existingUser,
+        username: existingUser?.username || '(none)'
+      });
 
       if (!existingUser) {
-        console.log('📝 Creating new user record in Supabase...');
+        console.log('📝 User does NOT exist in Supabase, creating new record...');
+
+        // Generate default username from wallet address
+        const defaultUsername = `User_${walletAddress.substring(0, 8)}`;
+        console.log('📝 Using default username:', defaultUsername);
 
         const newUserData = {
           wallet_address: walletAddress.toLowerCase(),
-          username: null,
+          username: defaultUsername, // FIX: Use default username instead of null
           bio: null,
           avatar_url: null,
           is_creator: false,
@@ -295,18 +427,50 @@ export const Web3Provider = ({ children }) => {
           following_count: 0
         };
 
+        console.log('📋 New user data to insert:', newUserData);
+
         const result = await SupabaseService.createUser(newUserData);
 
         if (result.success) {
           console.log('✅ User created in Supabase on first connection');
+          console.log('📊 Created user data:', result.data);
         } else {
           console.error('❌ Failed to create user in Supabase:', result.error);
+          console.error('❌ Error details:', result);
         }
       } else {
         console.log('✅ User already exists in Supabase');
+        console.log('📊 Existing user data:', {
+          username: existingUser.username,
+          is_creator: existingUser.is_creator,
+          bio: existingUser.bio || '(none)',
+          avatar_url: existingUser.avatar_url || '(none)'
+        });
+
+        // If user exists but has no username, update with default
+        if (!existingUser.username || existingUser.username.trim() === '') {
+          console.log('⚠️ User exists but has no username, updating with default...');
+          const defaultUsername = `User_${walletAddress.substring(0, 8)}`;
+
+          const updateResult = await SupabaseService.createOrUpdateUser({
+            wallet_address: walletAddress.toLowerCase(),
+            username: defaultUsername
+          });
+
+          if (updateResult.success) {
+            console.log('✅ Updated user with default username:', defaultUsername);
+          } else {
+            console.error('❌ Failed to update username:', updateResult.error);
+          }
+        }
       }
+      console.log('🔍 ========== CHECK/CREATE COMPLETE ==========');
     } catch (error) {
-      console.error('❌ Error checking/creating Supabase user:', error);
+      console.error('❌ ========== SUPABASE USER CHECK/CREATE ERROR ==========');
+      console.error('❌ Error:', error);
+      console.error('❌ Message:', error.message);
+      console.error('❌ Stack:', error.stack);
+      console.error('❌ ========== ERROR END ==========');
     }
   };
 
@@ -371,19 +535,33 @@ export const Web3Provider = ({ children }) => {
   };
 
   const becomeCreator = async () => {
+    console.log('🌟 ========== BECOME CREATOR FLOW ==========');
+
     if (!account) {
+      console.error('❌ No account connected');
       return { success: false, message: 'Please connect your wallet first.' };
     }
 
+    console.log('📊 Current state:', {
+      account,
+      hasUser: !!user,
+      username: user?.username || '(none)',
+      isCreator: user?.isCreator,
+      hasContract: !!contract
+    });
+
     if (!user) {
+      console.error('❌ User not loaded');
       return { success: false, message: 'Please register your account first before becoming a creator.' };
     }
 
     if (user.isCreator) {
+      console.warn('⚠️ User is already a creator');
       return { success: false, message: 'You are already a creator!' };
     }
 
     if (!contract) {
+      console.error('❌ Contract not initialized');
       return { success: false, message: 'Smart contract not initialized. Please check your network connection.' };
     }
 
@@ -391,36 +569,78 @@ export const Web3Provider = ({ children }) => {
       setLoading(true);
 
       // Step 0: Check if user is registered on blockchain, if not register them
-      console.log('🔍 Checking blockchain registration...');
+      console.log('🔍 Step 0: Checking blockchain registration...');
       const userOnBlockchain = await contract.users(account);
 
+      console.log('📊 Blockchain user data:', {
+        exists: userOnBlockchain.exists,
+        username: userOnBlockchain.username || '(none)',
+        isCreator: userOnBlockchain.isCreator,
+        address: account
+      });
+
       if (!userOnBlockchain.exists) {
-        console.log('📝 User not registered on blockchain, registering now...');
+        console.log('📝 User NOT registered on blockchain, registering now...');
+
+        // Generate username if missing
+        const username = user.username || `User_${account.substring(0, 8)}`;
+        console.log('📋 Registration parameters:', {
+          username,
+          avatarUrl: user.avatarUrl || 'QmDefaultAvatar',
+          bio: user.bio || ''
+        });
 
         // Register user on blockchain first
         const registerTx = await contract.registerUser(
-          user.username || `User${account.substring(0, 6)}`,
+          username,
           user.avatarUrl || 'QmDefaultAvatar',
           user.bio || ''
         );
         console.log('⏳ Registration transaction sent:', registerTx.hash);
-        await registerTx.wait();
-        console.log('✅ User registered on blockchain');
+
+        const registerReceipt = await registerTx.wait();
+        console.log('✅ Registration transaction confirmed:', {
+          hash: registerReceipt.hash,
+          blockNumber: registerReceipt.blockNumber,
+          status: registerReceipt.status
+        });
+
+        // Verify registration
+        const userAfterReg = await contract.users(account);
+        console.log('📊 User after registration:', {
+          exists: userAfterReg.exists,
+          username: userAfterReg.username,
+          isCreator: userAfterReg.isCreator
+        });
       } else {
         console.log('✅ User already registered on blockchain');
       }
 
       // Step 1: Call blockchain becomeCreator function
-      console.log('⛓️ Calling becomeCreator on blockchain...');
+      console.log('⛓️ Step 1: Calling becomeCreator on blockchain...');
       const tx = await contract.becomeCreator();
       console.log('⏳ Transaction sent:', tx.hash);
+      console.log('⏳ Waiting for confirmation...');
 
       // Wait for transaction confirmation
       const receipt = await tx.wait();
-      console.log('✅ Transaction confirmed:', receipt);
+      console.log('✅ Transaction confirmed:', {
+        hash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        status: receipt.status,
+        gasUsed: receipt.gasUsed?.toString()
+      });
+
+      // Verify creator status on blockchain
+      const userAfterCreator = await contract.users(account);
+      console.log('📊 User after becomeCreator:', {
+        exists: userAfterCreator.exists,
+        username: userAfterCreator.username,
+        isCreator: userAfterCreator.isCreator
+      });
 
       // Step 2: Update Supabase after blockchain confirmation
-      console.log('📝 Updating is_creator in Supabase...');
+      console.log('📝 Step 2: Updating is_creator in Supabase...');
       const supabaseUpdate = {
         wallet_address: account.toLowerCase(),
         is_creator: true
@@ -430,31 +650,49 @@ export const Web3Provider = ({ children }) => {
 
       if (!result.success) {
         console.error('⚠️ Failed to update is_creator in Supabase:', result.error);
+        console.error('⚠️ Error details:', result);
         // Even if Supabase update fails, the blockchain transaction succeeded
         console.log('⚠️ You are registered as creator on blockchain, but database update failed');
       } else {
         console.log('✅ is_creator updated in Supabase');
+        console.log('✅ Supabase response:', result.data);
       }
 
       // Step 3: Reload user data
+      console.log('🔄 Step 3: Reloading user data...');
       await loadUserData(account);
 
+      console.log('🎉 ========== BECOME CREATOR SUCCESS ==========');
       return { success: true, message: 'Congratulations! You are now a creator!' };
 
     } catch (error) {
-      console.error('❌ Become creator error:', error);
+      console.error('❌ ========== BECOME CREATOR ERROR ==========');
+      console.error('❌ Error details:', {
+        error,
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        reason: error.reason,
+        data: error.data
+      });
 
       // Handle specific error cases
-      if (error.code === 'ACTION_REJECTED') {
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        console.log('❌ User rejected transaction');
         return { success: false, message: 'Transaction was rejected by user' };
       } else if (error.message?.includes('Already a creator')) {
+        console.log('⚠️ Already a creator on blockchain');
         return { success: false, message: 'You are already registered as a creator on the blockchain!' };
-      } else if (error.message?.includes('User already registered')) {
-        // If registration fails because already registered, try becomeCreator again
-        console.log('ℹ️ User already registered, this is fine, continuing...');
-        return { success: false, message: 'Registration error occurred. Please try again.' };
+      } else if (error.message?.includes('User not registered')) {
+        console.error('❌ CRITICAL: User not registered on blockchain!');
+        return { success: false, message: 'Your account is not registered on the blockchain. Please reload the page and try again.' };
+      } else if (error.message?.includes('Username cannot be empty')) {
+        console.error('❌ CRITICAL: Username is empty!');
+        return { success: false, message: 'Username is required. Please complete your profile first.' };
       }
 
+      console.error('❌ Unknown error:', error.message);
+      console.error('❌ ========== ERROR END ==========');
       return { success: false, message: 'Failed to become creator: ' + error.message };
     } finally {
       setLoading(false);

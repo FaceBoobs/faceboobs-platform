@@ -957,6 +957,124 @@ const Messages = () => {
         contractAddress: CONTRACT_ADDRESS
       });
 
+      // ========== PRE-TRANSACTION VALIDATION ==========
+      console.log('🔍 ========== PRE-TRANSACTION VALIDATION ==========');
+
+      // 1. Check if buyer is registered on blockchain
+      console.log('🔍 Step 1: Checking if buyer is registered on blockchain...');
+      try {
+        const buyerOnBlockchain = await contract.users(signerAddress);
+        console.log('📊 Buyer blockchain data:', {
+          exists: buyerOnBlockchain.exists,
+          username: buyerOnBlockchain.username,
+          isCreator: buyerOnBlockchain.isCreator,
+          address: signerAddress
+        });
+
+        if (!buyerOnBlockchain.exists) {
+          console.error('❌ BUYER NOT REGISTERED on blockchain!');
+          throw new Error('Your account is not registered on the blockchain. Please reload the page to complete registration, then try again.');
+        }
+        console.log('✅ Buyer is registered on blockchain');
+      } catch (error) {
+        if (error.message?.includes('not registered')) {
+          throw error;
+        }
+        console.error('❌ Failed to check buyer registration:', error);
+        throw new Error('Failed to verify your blockchain registration. Please try again.');
+      }
+
+      // 2. Check if content exists and get its details
+      console.log('🔍 Step 2: Checking if content exists on blockchain...');
+      try {
+        const contentOnBlockchain = await contract.contents(message.blockchain_content_id);
+        console.log('📊 Content blockchain data:', {
+          creator: contentOnBlockchain.creator,
+          contentHash: contentOnBlockchain.contentHash,
+          price: contentOnBlockchain.price.toString(),
+          priceInBNB: ethers.formatEther(contentOnBlockchain.price),
+          isPaid: contentOnBlockchain.isPaid,
+          timestamp: contentOnBlockchain.timestamp.toString(),
+          purchaseCount: contentOnBlockchain.purchaseCount.toString()
+        });
+
+        // Check if content exists (creator should not be zero address)
+        if (contentOnBlockchain.creator === '0x0000000000000000000000000000000000000000') {
+          console.error('❌ CONTENT DOES NOT EXIST on blockchain!');
+          throw new Error(`Content with ID ${message.blockchain_content_id} does not exist on the blockchain. It may have been deleted or never registered.`);
+        }
+        console.log('✅ Content exists on blockchain');
+
+        // Check if content is marked as paid
+        if (!contentOnBlockchain.isPaid) {
+          console.error('❌ CONTENT IS NOT MARKED AS PAID on blockchain!');
+          throw new Error('This content is registered as free on the blockchain. Cannot purchase free content.');
+        }
+        console.log('✅ Content is marked as paid');
+
+        // Check if prices match
+        const expectedPrice = ethers.formatEther(contentOnBlockchain.price);
+        const providedPrice = ethers.formatEther(priceInWei);
+        if (expectedPrice !== providedPrice) {
+          console.warn('⚠️ PRICE MISMATCH!', {
+            expectedPrice,
+            providedPrice,
+            difference: parseFloat(expectedPrice) - parseFloat(providedPrice)
+          });
+          // Update priceInWei to match blockchain price
+          priceInWei = contentOnBlockchain.price;
+          console.log('🔄 Updated price to match blockchain:', priceInWei.toString());
+        } else {
+          console.log('✅ Price matches blockchain price');
+        }
+      } catch (error) {
+        if (error.message?.includes('does not exist') || error.message?.includes('free content')) {
+          throw error;
+        }
+        console.error('❌ Failed to check content:', error);
+        throw new Error('Failed to verify content on blockchain. The content may not exist or may not be properly registered.');
+      }
+
+      // 3. Check if already purchased
+      console.log('🔍 Step 3: Checking if content already purchased...');
+      try {
+        const hasAccess = await contract.getContentAccess(signerAddress, message.blockchain_content_id);
+        console.log('📊 Content access status:', hasAccess);
+
+        if (hasAccess) {
+          console.error('❌ CONTENT ALREADY PURCHASED!');
+          throw new Error('You have already purchased this content.');
+        }
+        console.log('✅ Content not yet purchased');
+      } catch (error) {
+        if (error.message?.includes('already purchased')) {
+          throw error;
+        }
+        console.error('❌ Failed to check access:', error);
+        // Don't throw here, continue to gas estimation
+      }
+
+      // 4. Check content counter
+      console.log('🔍 Step 4: Checking content counter...');
+      try {
+        const contentCounter = await contract.contentCounter();
+        console.log('📊 Content counter:', contentCounter.toString());
+        console.log('📊 Requested content ID:', message.blockchain_content_id);
+
+        if (parseInt(message.blockchain_content_id) > parseInt(contentCounter.toString())) {
+          console.error('❌ CONTENT ID OUT OF RANGE!');
+          throw new Error(`Content ID ${message.blockchain_content_id} is invalid. Maximum content ID is ${contentCounter.toString()}.`);
+        }
+        console.log('✅ Content ID is within valid range');
+      } catch (error) {
+        if (error.message?.includes('invalid') || error.message?.includes('out of range')) {
+          throw error;
+        }
+        console.error('❌ Failed to check content counter:', error);
+      }
+
+      console.log('🔍 ========== PRE-VALIDATION COMPLETE ==========');
+
       // Estimate gas first
       console.log('⚡ Estimating gas...');
       let gasEstimate;
