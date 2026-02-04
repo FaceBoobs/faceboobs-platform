@@ -968,7 +968,47 @@ const Home = () => {
 
         {/* Suggested Profiles Sidebar */}
         {(
-          <div className="hidden lg:block sticky top-4 self-start w-full">
+          <div className="hidden lg:block sticky top-4 self-start space-y-3 w-full">
+            {/* Presale Banner */}
+            <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 rounded-xl shadow-lg p-6 text-white overflow-hidden relative">
+              {/* Decorative background elements */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -translate-y-16 translate-x-16"></div>
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full translate-y-12 -translate-x-12"></div>
+
+              {/* Content */}
+              <div className="relative z-10 text-center">
+                {/* Token - Large and Prominent */}
+                <div className="text-pink-200 font-extrabold text-4xl mb-4">
+                  $FBS
+                </div>
+
+                {/* Title */}
+                <h3 className="text-xl font-bold mb-2">
+                  Presale Coming Soon
+                </h3>
+
+                {/* Subtitle */}
+                <p className="text-sm opacity-90 mb-4">
+                  Be the first to invest in FaceBoobs and get exclusive early access
+                </p>
+
+                {/* CTA Button */}
+                <button
+                  onClick={() => {
+                    toast.success('🔔 You will be notified when the presale starts!');
+                  }}
+                  className="w-full bg-white text-purple-600 font-semibold py-3 px-6 rounded-lg hover:bg-purple-50 hover:scale-105 transition-all cursor-pointer shadow-md mb-3"
+                >
+                  Notify Me
+                </button>
+
+                {/* Coming Date Box - Small */}
+                <div className="bg-pink-100 text-purple-800 font-medium text-xs py-2 px-4 rounded-full inline-block">
+                  Coming December 2025
+                </div>
+              </div>
+            </div>
+
             <SuggestedProfiles />
           </div>
         )}

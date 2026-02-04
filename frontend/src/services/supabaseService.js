@@ -329,7 +329,14 @@ export class SupabaseService {
       const { data, error } = await supabase
         .from('comments')
         .insert([commentData])
-        .select()
+        .select(`
+          *,
+          users (
+            username,
+            avatar_url,
+            wallet_address
+          )
+        `)
         .single();
 
       if (error) throw error;
@@ -367,7 +374,14 @@ export class SupabaseService {
 
       const { data, error } = await supabase
         .from('comments')
-        .select('*')
+        .select(`
+          *,
+          users (
+            username,
+            avatar_url,
+            wallet_address
+          )
+        `)
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 

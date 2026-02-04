@@ -6,7 +6,7 @@ import { SupabaseService } from '../services/supabaseService';
 import { useToast } from '../contexts/ToastContext';
 
 const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
-  const { account, user } = useWeb3();
+  const { account, user, getMediaUrl } = useWeb3();
   const { toast } = useToast();
 
   const [comments, setComments] = useState([]);
@@ -259,19 +259,30 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
               <div key={comment.id} className="flex space-x-3 animate-fade-in">
                 {/* Avatar */}
                 <div className="flex-shrink-0">
-                  {comment.avatar ? (
-                    <img
-                      src={comment.avatar}
-                      alt={comment.username || 'User'}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-white rounded-full flex items-center justify-center">
-                      <span className="text-pink-800 font-semibold text-sm">
-                        {(comment.username || 'U').charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
+                  {(() => {
+                    const avatarUrl = comment.users?.avatar_url || comment.avatar;
+                    const mediaSrc = avatarUrl ? getMediaUrl(avatarUrl) : null;
+
+                    return mediaSrc ? (
+                      <img
+                        src={mediaSrc}
+                        alt={comment.users?.username || comment.username || 'User'}
+                        className="w-10 h-10 rounded-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextElementSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null;
+                  })()}
+                  <div
+                    className="w-10 h-10 bg-gradient-to-br from-pink-400 to-white rounded-full flex items-center justify-center"
+                    style={{ display: (comment.users?.avatar_url || comment.avatar) && getMediaUrl(comment.users?.avatar_url || comment.avatar) ? 'none' : 'flex' }}
+                  >
+                    <span className="text-pink-800 font-semibold text-sm">
+                      {(comment.users?.username || comment.username || 'U').charAt(0).toUpperCase()}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Comment Content */}
@@ -279,7 +290,7 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
                   <div className="bg-gray-50 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-semibold text-gray-900">
-                        {comment.username || `User${comment.user_address?.substring(0, 6)}`}
+                        {comment.users?.username || comment.username || `User${comment.user_address?.substring(0, 6)}`}
                       </span>
                       <span className="text-xs text-gray-500">
                         {formatTimestamp(comment.created_at)}
