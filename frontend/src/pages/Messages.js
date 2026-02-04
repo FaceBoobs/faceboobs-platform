@@ -388,14 +388,14 @@ const Messages = () => {
 
             // If message has paid media and user is not the sender, check if unlocked
             if (message.has_media && message.is_paid && message.sender_address?.toLowerCase() !== account?.toLowerCase()) {
-              const { data: purchase } = await supabase
+              const { data: purchase, error } = await supabase
                 .from('message_purchases')
                 .select('*')
                 .eq('message_id', message.id)
                 .eq('buyer_address', account.toLowerCase())
-                .single();
+                .maybeSingle(); // Use maybeSingle() to avoid 406 error when no record exists
 
-              isUnlocked = !!purchase;
+              isUnlocked = !!purchase && !error;
               console.log(`📊 Message ${message.id} unlock status:`, isUnlocked);
             }
 
@@ -1165,27 +1165,27 @@ const Messages = () => {
       };
       console.log('💾 Purchase data:', purchaseData);
 
-      const { data: purchaseResult, error: purchaseError } = await supabase
+      const { error: purchaseError } = await supabase
         .from('message_purchases')
         .insert([purchaseData]);
 
       if (purchaseError) {
-        console.error('❌ Database insert error:', {
-          error: purchaseError,
-          code: purchaseError.code,
-          message: purchaseError.message,
-          details: purchaseError.details
-        });
-
         // Check if error is due to duplicate (already purchased)
         if (purchaseError.code === '23505') {
-          console.log('⚠️ Duplicate purchase entry (already purchased), continuing...');
+          // Not an error - duplicate purchase record (already purchased)
+          console.log('ℹ️ Purchase already recorded in database (duplicate entry)');
         } else {
+          // Real error - log details
           console.error('❌ Failed to save purchase record');
+          console.error('❌ Database insert error:', {
+            code: purchaseError.code,
+            message: purchaseError.message,
+            details: purchaseError.details
+          });
           throw purchaseError;
         }
       } else {
-        console.log('✅ Purchase recorded successfully:', purchaseResult);
+        console.log('✅ Purchase recorded successfully');
       }
 
       toast.success('Content unlocked! 🎉');
@@ -1197,46 +1197,38 @@ const Messages = () => {
       console.log('🔵 ========== UNLOCK COMPLETE ==========');
 
     } catch (error) {
-      console.error('❌ ========== UNLOCK ERROR ==========');
-      console.error('❌ Error details:', {
-        error: error,
-        name: error.name,
-        message: error.message,
-        code: error.code,
-        data: error.data,
-        reason: error.reason,
-        action: error.action,
-        stack: error.stack
-      });
-
       // Enhanced error handling with specific messages
       let userMessage = 'Failed to unlock content';
+      let isCriticalError = true;
 
       if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
-        console.log('❌ User rejected transaction');
+        // User cancelled - not critical
+        console.log('ℹ️ User cancelled unlock transaction');
         userMessage = 'Transaction cancelled';
-      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.message?.includes('insufficient funds') || error.message?.includes('Insufficient balance')) {
-        console.log('❌ Insufficient funds');
-        userMessage = error.message?.includes('Insufficient balance')
-          ? error.message
-          : 'Insufficient BNB in your wallet';
+        isCriticalError = false;
       } else if (error.message?.includes('Already purchased') || error.code === '23505') {
-        console.log('⚠️ Already purchased');
+        // Already purchased - not an error, just info
+        console.log('ℹ️ Content already purchased');
         userMessage = 'You already own this content';
         toast.info(userMessage);
         await loadMessages(activeChat.address);
         return; // Exit early, not an error
+      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.message?.includes('insufficient funds') || error.message?.includes('Insufficient balance')) {
+        console.error('❌ Insufficient funds');
+        userMessage = error.message?.includes('Insufficient balance')
+          ? error.message
+          : 'Insufficient BNB in your wallet';
       } else if (error.message?.includes('Smart contract not found') || error.message?.includes('NO CONTRACT DEPLOYED')) {
-        console.log('❌ Contract not deployed');
+        console.error('❌ Smart contract not deployed');
         userMessage = 'Smart contract not deployed on this network. Please switch to BSC Testnet.';
       } else if (error.message?.includes('Content does not exist')) {
-        console.log('❌ Content not found on blockchain');
+        console.error('❌ Content not found on blockchain');
         userMessage = 'This content does not exist on the blockchain';
       } else if (error.message?.includes('buyContent function not found') || error.message?.includes('Contract may be outdated')) {
-        console.log('❌ Contract outdated');
+        console.error('❌ Contract outdated');
         userMessage = 'Smart contract is outdated or incorrect';
       } else if (error.message?.includes('Gas estimation failed') || error.code === 'CALL_EXCEPTION') {
-        console.log('❌ Gas estimation failed / Call exception');
+        console.error('❌ Gas estimation failed / Call exception');
         if (error.reason) {
           userMessage = `Contract error: ${error.reason}`;
         } else if (error.message?.includes('missing revert data')) {
@@ -1245,15 +1237,23 @@ const Messages = () => {
           userMessage = 'Transaction will likely fail. Please verify the content is properly registered on blockchain.';
         }
       } else if (error.message?.includes('network')) {
-        console.log('❌ Network error');
+        console.error('❌ Network error');
         userMessage = 'Network error. Please check your connection and try again.';
       } else {
-        console.log('❌ Unknown error');
+        // Unknown error - log details for debugging
+        console.error('❌ Unlock failed with unknown error');
+        console.error('❌ Error details:', {
+          message: error.message,
+          code: error.code,
+          reason: error.reason
+        });
         userMessage = error.message || 'Unknown error occurred';
       }
 
-      toast.error(userMessage);
-      console.error('❌ ========== ERROR END ==========');
+      // Only show error toast if it's a real error (not user cancellation)
+      if (isCriticalError) {
+        toast.error(userMessage);
+      }
     } finally {
       setUnlockingMedia(prev => ({ ...prev, [message.id]: false }));
     }

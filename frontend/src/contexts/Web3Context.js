@@ -301,26 +301,29 @@ export const Web3Provider = ({ children }) => {
               isCreator: userAfterReg.isCreator
             });
           } catch (regError) {
-            console.error('❌ ========== BLOCKCHAIN REGISTRATION ERROR ==========');
-            console.error('❌ Error details:', {
-              error: regError,
-              message: regError.message,
-              code: regError.code,
-              reason: regError.reason,
-              data: regError.data
-            });
-
-            // Handle specific error cases
+            // Handle specific error cases - only log errors for critical issues
             if (regError.message && regError.message.toLowerCase().includes('already registered')) {
+              // Not an error - user is already registered (concurrent registration or refresh)
               console.log('ℹ️ User already registered on blockchain (concurrent registration)');
-            } else if (regError.message && regError.message.toLowerCase().includes('username cannot be empty')) {
-              console.error('❌ CRITICAL: Username is empty! This should not happen.');
             } else if (regError.code === 'ACTION_REJECTED' || regError.code === 4001) {
-              console.log('❌ User rejected the registration transaction');
+              // User cancelled - not critical, just log info
+              console.log('ℹ️ User cancelled the registration transaction');
+            } else if (regError.message && regError.message.toLowerCase().includes('username cannot be empty')) {
+              // Critical error - username validation failed
+              console.error('❌ CRITICAL: Username is empty! This should not happen.');
+              console.error('❌ Error details:', {
+                message: regError.message,
+                username: userData?.username
+              });
             } else {
-              console.error('❌ Blockchain registration failed with unknown error');
+              // Unknown error - log for debugging
+              console.error('❌ Blockchain registration failed');
+              console.error('❌ Error details:', {
+                message: regError.message,
+                code: regError.code,
+                reason: regError.reason
+              });
             }
-            console.error('❌ ========== ERROR END ==========');
           }
         } else {
           console.log('⚠️ User not found in Supabase or failed to fetch data');
@@ -734,7 +737,7 @@ export const Web3Provider = ({ children }) => {
 
         console.log('📁 Nome file generato:', fileName);
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('avatars')
           .upload(fileName, avatarFile, {
             cacheControl: '3600',
