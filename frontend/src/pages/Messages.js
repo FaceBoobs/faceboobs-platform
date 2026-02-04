@@ -782,6 +782,15 @@ const Messages = () => {
   // Unlock paid media content
   const handleUnlockMedia = async (message) => {
     console.log('🔵 ========== UNLOCK MEDIA DEBUG ==========');
+    console.log('🔍 Unlock attempt:', {
+      messageId: message?.id,
+      amount: message?.price,
+      amountInBNB: message?.price,
+      from: account,
+      contractAddress: CONTRACT_ADDRESS,
+      recipientAddress: message?.sender_address,
+      blockchain_content_id: message?.blockchain_content_id
+    });
     console.log('🔵 handleUnlockMedia called with message:', {
       messageId: message?.id,
       blockchain_content_id: message?.blockchain_content_id,
@@ -814,6 +823,58 @@ const Messages = () => {
     if (!message.price || parseFloat(message.price) <= 0) {
       console.error('❌ Invalid price', { price: message.price });
       toast.error('Invalid content price');
+      return;
+    }
+
+    // ========== CRITICAL: CHECK USER REGISTRATION FIRST ==========
+    console.log('🔍 STEP 0: Pre-verification - Checking MetaMask and user registration...');
+
+    if (!window.ethereum) {
+      console.error('❌ MetaMask not installed');
+      toast.error('MetaMask not installed');
+      return;
+    }
+
+    try {
+      console.log('🦊 Creating provider and signer for pre-check...');
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const signerAddress = await signer.getAddress();
+
+      console.log('✅ Signer created:', signerAddress);
+      console.log('🔍 Creating contract instance for registration check...');
+
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, signer);
+
+      console.log('🔍 CRITICAL CHECK: Verifying buyer is registered on blockchain...');
+      const buyerOnBlockchain = await contract.users(signerAddress);
+      console.log('📊 Buyer blockchain registration status:', {
+        exists: buyerOnBlockchain.exists,
+        username: buyerOnBlockchain.username,
+        isCreator: buyerOnBlockchain.isCreator,
+        address: signerAddress
+      });
+
+      if (!buyerOnBlockchain.exists) {
+        console.error('❌ BUYER NOT REGISTERED on blockchain!');
+        toast.error('Your account is not registered on the blockchain. Please reload the page to complete registration, then try again.');
+        return;
+      }
+      console.log('✅ CRITICAL CHECK PASSED: Buyer is registered on blockchain');
+
+      // Also check content exists before asking for confirmation
+      console.log('🔍 Pre-checking if content exists on blockchain...');
+      const contentOnBlockchain = await contract.contents(message.blockchain_content_id);
+      if (contentOnBlockchain.creator === '0x0000000000000000000000000000000000000000') {
+        console.error('❌ Content does not exist on blockchain!');
+        toast.error(`This content does not exist on the blockchain. It may have been deleted or the blockchain ID is invalid.`);
+        return;
+      }
+      console.log('✅ Content exists on blockchain');
+
+    } catch (preCheckError) {
+      console.error('❌ Pre-verification failed:', preCheckError);
+      toast.error('Failed to verify your account status. Please try again.');
       return;
     }
 
@@ -1077,6 +1138,13 @@ const Messages = () => {
 
       // Estimate gas first
       console.log('⚡ Estimating gas...');
+      console.log('⚡ Gas estimation parameters:', {
+        contentId: message.blockchain_content_id,
+        contentIdType: typeof message.blockchain_content_id,
+        priceInWei: priceInWei.toString(),
+        from: signerAddress,
+        to: CONTRACT_ADDRESS
+      });
       let gasEstimate;
       try {
         gasEstimate = await contract.buyContent.estimateGas(
@@ -1085,13 +1153,40 @@ const Messages = () => {
         );
         console.log('✅ Gas estimation successful:', gasEstimate.toString());
       } catch (gasError) {
-        console.error('❌ Gas estimation failed:', {
-          error: gasError,
+        console.error('❌ ========== GAS ESTIMATION FAILED ==========');
+        console.error('❌ Error object:', gasError);
+        console.error('❌ Error details:', {
           message: gasError.message,
           code: gasError.code,
           data: gasError.data,
-          reason: gasError.reason
+          reason: gasError.reason,
+          error: gasError.error,
+          action: gasError.action,
+          transaction: gasError.transaction,
+          info: gasError.info
         });
+        console.error('❌ Error stack:', gasError.stack);
+        console.error('❌ Error keys:', Object.keys(gasError));
+
+        // Try to decode error data if available
+        if (gasError.data) {
+          console.error('❌ Raw error data:', gasError.data);
+          try {
+            const errorInterface = new ethers.Interface(CONTRACT_ABI.abi);
+            const decodedError = errorInterface.parseError(gasError.data);
+            console.error('❌ Decoded error:', decodedError);
+          } catch (decodeErr) {
+            console.error('❌ Could not decode error data:', decodeErr);
+          }
+        }
+
+        console.error('❌ Transaction would have been sent with:', {
+          to: CONTRACT_ADDRESS,
+          from: signerAddress,
+          data: `buyContent(${message.blockchain_content_id})`,
+          value: priceInWei.toString()
+        });
+        console.error('❌ ========================================');
 
         // Provide user-friendly error message
         if (gasError.message?.includes('User not registered') || gasError.reason?.includes('User not registered')) {
@@ -1100,6 +1195,8 @@ const Messages = () => {
           throw new Error('This content does not exist on the blockchain. It may have been deleted or the blockchain ID is invalid.');
         } else if (gasError.message?.includes('Already purchased')) {
           throw new Error('You have already purchased this content.');
+        } else if (gasError.message?.includes('missing revert data')) {
+          throw new Error('Smart contract rejected the transaction without providing a reason. This usually means:\n1. The contract is not deployed at this address\n2. The function signature is incorrect\n3. There is a low-level error in the contract\n\nPlease check that you are on the correct network (BSC Testnet) and that the contract is deployed.');
         } else if (gasError.message?.includes('revert')) {
           throw new Error(`Smart contract rejected the transaction: ${gasError.reason || gasError.message}`);
         } else {
@@ -1110,18 +1207,36 @@ const Messages = () => {
       console.log('🔍 ========== PRE-TRANSACTION SUMMARY ==========');
       console.log('📊 About to send transaction with:');
       console.log('   - Content ID:', message.blockchain_content_id);
+      console.log('   - Content ID (hex):', '0x' + BigInt(message.blockchain_content_id).toString(16).padStart(64, '0'));
       console.log('   - Price (BNB):', priceInBNB);
       console.log('   - Price (Wei):', priceInWei.toString());
+      console.log('   - Price (Wei, hex):', '0x' + priceInWei.toString(16));
       console.log('   - Your balance (BNB):', balanceInBNB);
       console.log('   - Network:', network.chainId.toString(), network.name);
       console.log('   - Contract:', CONTRACT_ADDRESS);
+      console.log('   - From:', signerAddress);
       console.log('   - Gas estimate:', gasEstimate.toString());
+      console.log('   - Gas limit (with buffer):', (gasEstimate * 120n / 100n).toString());
+
+      // Generate transaction data preview
+      const buyContentInterface = contract.interface;
+      const txData = buyContentInterface.encodeFunctionData('buyContent', [message.blockchain_content_id]);
+      console.log('   - Transaction data:', txData);
+      console.log('   - Function selector:', txData.slice(0, 10));
+      console.log('   - Encoded parameters:', txData.slice(10));
       console.log('🔍 ========================================');
 
       toast.info('Please confirm the transaction in MetaMask...');
 
       // Call buyContent on smart contract
       console.log('📤 Sending transaction to blockchain...');
+      console.log('📤 Transaction object:', {
+        to: CONTRACT_ADDRESS,
+        from: signerAddress,
+        data: txData,
+        value: priceInWei.toString(),
+        gasLimit: (gasEstimate * 120n / 100n).toString()
+      });
       let tx;
       try {
         tx = await contract.buyContent(message.blockchain_content_id, {
@@ -1132,16 +1247,25 @@ const Messages = () => {
           hash: tx.hash,
           from: tx.from,
           to: tx.to,
-          value: tx.value.toString()
+          value: tx.value.toString(),
+          data: tx.data,
+          nonce: tx.nonce,
+          gasLimit: tx.gasLimit?.toString(),
+          chainId: tx.chainId?.toString()
         });
       } catch (txError) {
-        console.error('❌ Transaction failed:', {
-          error: txError,
+        console.error('❌ ========== TRANSACTION SEND FAILED ==========');
+        console.error('❌ Transaction error:', txError);
+        console.error('❌ Error details:', {
           message: txError.message,
           code: txError.code,
           data: txError.data,
-          reason: txError.reason
+          reason: txError.reason,
+          action: txError.action,
+          transaction: txError.transaction
         });
+        console.error('❌ Error keys:', Object.keys(txError));
+        console.error('❌ ===========================================');
         throw txError;
       }
 
