@@ -390,6 +390,26 @@ export const Web3Provider = ({ children }) => {
     try {
       setLoading(true);
 
+      // Step 0: Check if user is registered on blockchain, if not register them
+      console.log('🔍 Checking blockchain registration...');
+      const userOnBlockchain = await contract.users(account);
+
+      if (!userOnBlockchain.exists) {
+        console.log('📝 User not registered on blockchain, registering now...');
+
+        // Register user on blockchain first
+        const registerTx = await contract.registerUser(
+          user.username || `User${account.substring(0, 6)}`,
+          user.avatarUrl || 'QmDefaultAvatar',
+          user.bio || ''
+        );
+        console.log('⏳ Registration transaction sent:', registerTx.hash);
+        await registerTx.wait();
+        console.log('✅ User registered on blockchain');
+      } else {
+        console.log('✅ User already registered on blockchain');
+      }
+
       // Step 1: Call blockchain becomeCreator function
       console.log('⛓️ Calling becomeCreator on blockchain...');
       const tx = await contract.becomeCreator();
@@ -429,8 +449,10 @@ export const Web3Provider = ({ children }) => {
         return { success: false, message: 'Transaction was rejected by user' };
       } else if (error.message?.includes('Already a creator')) {
         return { success: false, message: 'You are already registered as a creator on the blockchain!' };
-      } else if (error.message?.includes('User not registered')) {
-        return { success: false, message: 'Please complete your registration on blockchain first' };
+      } else if (error.message?.includes('User already registered')) {
+        // If registration fails because already registered, try becomeCreator again
+        console.log('ℹ️ User already registered, this is fine, continuing...');
+        return { success: false, message: 'Registration error occurred. Please try again.' };
       }
 
       return { success: false, message: 'Failed to become creator: ' + error.message };
