@@ -199,22 +199,39 @@ export const Web3Provider = ({ children }) => {
     try {
       console.log('🔍 Checking if user is registered on blockchain...');
 
-      // Check if user exists on blockchain
-      const isRegistered = await contractInstance.isUserRegistered(userAddress);
+      // Check if user exists on blockchain using users mapping
+      const userOnBlockchain = await contractInstance.users(userAddress);
+      const isRegistered = userOnBlockchain.exists;
 
       if (!isRegistered) {
-        console.log('📝 Auto-registering user on blockchain...');
+        console.log('📝 User not registered on blockchain, checking Supabase...');
 
-        try {
-          const tx = await contractInstance.registerUser();
-          console.log('⏳ Registration transaction sent:', tx.hash);
-          await tx.wait();
-          console.log('✅ User registered on blockchain successfully');
-        } catch (regError) {
-          // Silently handle if already registered error
-          if (regError.message && !regError.message.toLowerCase().includes('already registered')) {
-            console.error('❌ Blockchain registration failed:', regError);
+        // Get user data from Supabase
+        const { data: userData, success } = await SupabaseService.getUser(userAddress);
+
+        if (success && userData && userData.username) {
+          console.log('✅ User found in Supabase, auto-registering on blockchain...');
+
+          try {
+            // Call registerUser with required parameters
+            const tx = await contractInstance.registerUser(
+              userData.username,
+              userData.avatar_url || 'QmDefaultAvatar',
+              userData.bio || ''
+            );
+            console.log('⏳ Registration transaction sent:', tx.hash);
+            await tx.wait();
+            console.log('✅ User registered on blockchain successfully');
+          } catch (regError) {
+            // Handle registration error
+            if (regError.message && regError.message.toLowerCase().includes('already registered')) {
+              console.log('ℹ️ User already registered on blockchain');
+            } else {
+              console.error('❌ Blockchain registration failed:', regError);
+            }
           }
+        } else {
+          console.log('ℹ️ User not found in Supabase or incomplete profile, skipping blockchain registration');
         }
       } else {
         console.log('✅ User already registered on blockchain');

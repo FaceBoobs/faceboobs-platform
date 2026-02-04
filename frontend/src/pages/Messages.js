@@ -970,7 +970,9 @@ const Messages = () => {
         });
 
         // Provide user-friendly error message
-        if (gasError.message?.includes('Content does not exist')) {
+        if (gasError.message?.includes('User not registered') || gasError.reason?.includes('User not registered')) {
+          throw new Error('Your account is not registered on the blockchain yet. Please reload the page to complete the registration, then try again.');
+        } else if (gasError.message?.includes('Content does not exist')) {
           throw new Error('This content does not exist on the blockchain. It may have been deleted or the blockchain ID is invalid.');
         } else if (gasError.message?.includes('Already purchased')) {
           throw new Error('You have already purchased this content.');
