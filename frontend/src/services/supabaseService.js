@@ -365,6 +365,7 @@ export class SupabaseService {
 
       const { data, error } = await supabase
         .from('comments')
+        .select('*, users!comments_user_address_fkey(username, avatar_url, wallet_address)')
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 
