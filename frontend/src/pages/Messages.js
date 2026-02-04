@@ -697,6 +697,12 @@ const Messages = () => {
       return;
     }
 
+    // Check if user is a creator before allowing paid content
+    if (isPaidContent && !user?.isCreator) {
+      toast.error('You need to be registered as a creator to sell content. Please upgrade your account first.');
+      return;
+    }
+
     try {
       setUploadingMedia(true);
       console.log('📤 Starting media upload process...');
@@ -1848,7 +1854,13 @@ const Messages = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsPaidContent(!isPaidContent)}
+                    onClick={() => {
+                      if (!user?.isCreator && !isPaidContent) {
+                        toast.error('You need to be a creator to sell content. Please upgrade your account first.');
+                        return;
+                      }
+                      setIsPaidContent(!isPaidContent);
+                    }}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                       isPaidContent ? 'bg-green-600' : 'bg-gray-300'
                     }`}
@@ -1887,9 +1899,16 @@ const Messages = () => {
                 )}
 
                 {!isPaidContent && (
-                  <p className="text-xs text-gray-600">
-                    ✅ Free content
-                  </p>
+                  <>
+                    <p className="text-xs text-gray-600">
+                      ✅ Free content
+                    </p>
+                    {!user?.isCreator && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        ⚠️ You need to be a creator to sell content
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

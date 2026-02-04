@@ -383,10 +383,23 @@ export const Web3Provider = ({ children }) => {
       return { success: false, message: 'You are already a creator!' };
     }
 
+    if (!contract) {
+      return { success: false, message: 'Smart contract not initialized. Please check your network connection.' };
+    }
+
     try {
       setLoading(true);
 
-      // Update Supabase ONLY (no blockchain call)
+      // Step 1: Call blockchain becomeCreator function
+      console.log('⛓️ Calling becomeCreator on blockchain...');
+      const tx = await contract.becomeCreator();
+      console.log('⏳ Transaction sent:', tx.hash);
+
+      // Wait for transaction confirmation
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt);
+
+      // Step 2: Update Supabase after blockchain confirmation
       console.log('📝 Updating is_creator in Supabase...');
       const supabaseUpdate = {
         wallet_address: account.toLowerCase(),
@@ -397,18 +410,29 @@ export const Web3Provider = ({ children }) => {
 
       if (!result.success) {
         console.error('⚠️ Failed to update is_creator in Supabase:', result.error);
-        return { success: false, message: 'Failed to become creator: ' + result.error };
+        // Even if Supabase update fails, the blockchain transaction succeeded
+        console.log('⚠️ You are registered as creator on blockchain, but database update failed');
+      } else {
+        console.log('✅ is_creator updated in Supabase');
       }
 
-      console.log('✅ is_creator updated in Supabase');
-
-      // Reload user data
+      // Step 3: Reload user data
       await loadUserData(account);
 
       return { success: true, message: 'Congratulations! You are now a creator!' };
 
     } catch (error) {
       console.error('❌ Become creator error:', error);
+
+      // Handle specific error cases
+      if (error.code === 'ACTION_REJECTED') {
+        return { success: false, message: 'Transaction was rejected by user' };
+      } else if (error.message?.includes('Already a creator')) {
+        return { success: false, message: 'You are already registered as a creator on the blockchain!' };
+      } else if (error.message?.includes('User not registered')) {
+        return { success: false, message: 'Please complete your registration on blockchain first' };
+      }
+
       return { success: false, message: 'Failed to become creator: ' + error.message };
     } finally {
       setLoading(false);
