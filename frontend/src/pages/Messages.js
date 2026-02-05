@@ -786,6 +786,7 @@ const Messages = () => {
 
       if (!window.ethereum) {
         console.error('❌ MetaMask not installed');
+        toast.error('MetaMask not installed');
         return false;
       }
 
@@ -809,6 +810,7 @@ const Messages = () => {
         );
 
         console.log('⏳ Registration transaction sent:', tx.hash);
+        toast.info('Please wait for blockchain confirmation...');
         await tx.wait();
         console.log('✅ User registered successfully');
         toast.success('Account registered on blockchain!');
@@ -876,6 +878,16 @@ const Messages = () => {
       toast.error('Invalid content price');
       return;
     }
+
+    // ========== STEP 0: ENSURE USER IS REGISTERED ==========
+    console.log('🔍 STEP 0: Ensuring user is registered on blockchain...');
+    const isRegistered = await ensureUserIsRegistered();
+    if (!isRegistered) {
+      console.error('❌ User registration failed or cancelled');
+      setUnlockingMedia(prev => ({ ...prev, [message.id]: false }));
+      return;
+    }
+    console.log('✅ User registration confirmed - proceeding with unlock');
 
     // ========== CRITICAL: CHECK USER REGISTRATION FIRST ==========
     console.log('🔍 STEP 0: Pre-verification - Checking MetaMask and user registration...');
