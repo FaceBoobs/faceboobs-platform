@@ -445,7 +445,6 @@ export class SupabaseService {
       // Check if there are any valid post IDs before querying
       if (uniquePostIds.length === 0) {
         console.log('⚠️ No valid post IDs');
-        // Return notifications with empty postsMap
         const enrichedNotifications = notifications.map(notification => ({
           ...notification,
           from_username: 'Unknown User',
@@ -474,21 +473,22 @@ export class SupabaseService {
         }
       }
 
-      // Step 4: Fetch posts data
+      // Step 4: Fetch posts data - ✅ CON GESTIONE ERRORI MIGLIORATA
       let postsMap = {};
       if (uniquePostIds.length > 0) {
         console.log('📡 [getNotifications] Fetching posts with IDs:', uniquePostIds);
+
         const { data: posts, error: postsError } = await supabase
           .from('posts')
           .select('id, media_url')
           .in('id', uniquePostIds);
 
+        // ✅ FIX: NON bloccare se alcuni post non esistono
         if (postsError) {
           console.error('❌ [getNotifications] Error fetching posts:', postsError);
-          console.error('❌ [getNotifications] PostIds that caused error:', uniquePostIds);
-        }
-
-        if (!postsError && posts) {
+          console.warn('⚠️ Some posts may have been deleted, continuing without them');
+          // NON fare throw - continua con postsMap vuoto
+        } else if (posts && posts.length > 0) {
           console.log('✅ [getNotifications] Fetched posts:', posts.length);
           postsMap = posts.reduce((acc, post) => {
             acc[post.id] = post;
@@ -513,7 +513,6 @@ export class SupabaseService {
       return { success: false, error: error.message };
     }
   }
-
   static async markNotificationAsRead(notificationId, userAddress) {
     try {
       const { error } = await supabase

@@ -779,7 +779,58 @@ const Messages = () => {
     }
   };
 
-  // Unlock paid media content
+  // Ensure user is registered on blockchain
+  const ensureUserIsRegistered = async () => {
+    try {
+      console.log('🔍 Checking if user is registered on blockchain...');
+
+      if (!window.ethereum) {
+        console.error('❌ MetaMask not installed');
+        return false;
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const signerAddress = await signer.getAddress();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.abi, signer);
+
+      // Check registration
+      const userOnChain = await contract.users(signerAddress);
+
+      if (!userOnChain.exists) {
+        console.log('⚠️ User not registered, registering now...');
+        toast.info('Registering your account on blockchain...');
+
+        // Register user
+        const tx = await contract.registerUser(
+          user?.username || `User${signerAddress.substring(0, 6)}`,
+          user?.avatar_url || '',
+          user?.bio || ''
+        );
+
+        console.log('⏳ Registration transaction sent:', tx.hash);
+        await tx.wait();
+        console.log('✅ User registered successfully');
+        toast.success('Account registered on blockchain!');
+        return true;
+      }
+
+      console.log('✅ User already registered');
+      return true;
+    } catch (error) {
+      console.error('❌ Registration check/execution failed:', error);
+
+      if (error.code === 'ACTION_REJECTED') {
+        toast.error('Registration cancelled');
+        return false;
+      }
+
+      toast.error('Failed to register account: ' + error.message);
+      return false;
+    }
+  };
+
+    // Unlock paid media content
   const handleUnlockMedia = async (message) => {
     console.log('🔵 ========== UNLOCK MEDIA DEBUG ==========');
     console.log('🔍 Unlock attempt:', {
