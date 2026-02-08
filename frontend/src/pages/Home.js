@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Plus, Trash2, MoreHorizontal } from 'lucide-react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../contexts/Web3Context';
+import { useWallet } from '@solana/wallet-adapter-react'; // 🔧 FIX: Solana wallet check
 import { useLikes } from '../contexts/LikesContext';
 import { useComments } from '../contexts/CommentsContext';
 import { useToast } from '../contexts/ToastContext';
@@ -17,6 +18,7 @@ import SuggestedProfiles from '../components/SuggestedProfiles';
 
 const Home = () => {
   const { contract, user, account, loading: web3Loading, becomeCreator } = useWeb3();
+  const { publicKey, connected } = useWallet(); // 🔧 FIX: Solana wallet connection
   const { initializeMultipleLikes } = useLikes();
   const { initializeMultipleComments } = useComments();
   const { toast } = useToast();
@@ -37,13 +39,13 @@ const Home = () => {
   const processedPostIdRef = useRef(null);
   const scrollAttemptedRef = useRef(false);
 
-  // Redirect to login if not authenticated
+  // 🔧 FIX: Check Solana wallet connection
   useEffect(() => {
-    if (!web3Loading && !account) {
-      console.log('🔒 Not authenticated, redirecting to home with prompt');
-      toast.error('Please connect your wallet to access the feed');
+    if (!web3Loading && (!connected || !publicKey)) {
+      console.log('🔒 Not authenticated, Solana wallet not connected');
+      // toast.error('Please connect your Solana wallet to access the feed'); // Removed to avoid spam
     }
-  }, [account, web3Loading, navigate, toast]);
+  }, [connected, publicKey, web3Loading, navigate, toast]);
 
   useEffect(() => {
     if (account) {
@@ -126,10 +128,11 @@ const Home = () => {
   const loadFollowingAndFeed = async () => {
     try {
       setLoading(true);
-      console.log('🔵 [Home] Loading feed for:', account);
+      // 🔧 FIX: Use Solana wallet publicKey
+      console.log('🔵 [Home] Loading feed for:', publicKey?.toString());
 
-      if (!account) {
-        console.log('⚠️ [Home] Account not available yet');
+      if (!connected || !publicKey) {
+        console.log('⚠️ [Home] Solana wallet not connected yet');
         setLoading(false);
         return;
       }
@@ -313,9 +316,10 @@ const Home = () => {
       return;
     }
 
-    if (!account) {
-      console.error('❌ No account connected');
-      toast.error('Please connect your wallet first');
+    // 🔧 FIX: Check Solana wallet connection
+    if (!connected || !publicKey) {
+      console.error('❌ No Solana wallet connected');
+      toast.error('Please connect your Solana wallet first');
       return;
     }
 
@@ -427,10 +431,11 @@ const Home = () => {
   };
 
   const checkContentAccess = async (contentId) => {
-    if (!account) return false;
+    // 🔧 FIX: Check Solana wallet connection
+    if (!connected || !publicKey) return false;
 
     try {
-      const result = await SupabaseService.checkContentAccess(account, contentId);
+      const result = await SupabaseService.checkContentAccess(publicKey.toString(), contentId);
       return result.success ? result.hasAccess : false;
     } catch (error) {
       console.error('Error checking content access:', error);
@@ -541,7 +546,7 @@ const Home = () => {
     const [hasAccess, setHasAccess] = useState(false);
     const [purchasing, setPurchasing] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
-
+ 
     useEffect(() => {
       if (!content?.id) return;
       
@@ -877,13 +882,14 @@ const Home = () => {
     );
   }
 
-  if (!account) {
+  // 🔧 FIX: Check Solana wallet instead of BSC account
+  if (!connected || !publicKey) {
     return (
       <div className="w-full text-center py-12">
         <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white p-8 mx-4 max-w-md mx-auto">
           <div className="text-6xl mb-4">🔐</div>
           <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
-          <p className="opacity-90 mb-6">Connect your wallet to access your personalized feed</p>
+          <p className="opacity-90 mb-6">Connect your Solana wallet to access your personalized feed</p>
           <div className="text-sm opacity-75">
             Your feed shows posts from creators you follow
           </div>
@@ -969,48 +975,9 @@ const Home = () => {
         {/* Suggested Profiles Sidebar */}
         {(
           <div className="hidden lg:block sticky top-4 self-start space-y-3 w-full">
-            {/* Presale Banner */}
-            <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 rounded-xl shadow-lg p-6 text-white overflow-hidden relative">
-              {/* Decorative background elements */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -translate-y-16 translate-x-16"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full translate-y-12 -translate-x-12"></div>
-
-              {/* Content */}
-              <div className="relative z-10 text-center">
-                {/* Token - Large and Prominent */}
-                <div className="text-pink-200 font-extrabold text-4xl mb-4">
-                  $FBS
-                </div>
-
-                {/* Title */}
-                <h3 className="text-xl font-bold mb-2">
-                  Presale Coming Soon
-                </h3>
-
-                {/* Subtitle */}
-                <p className="text-sm opacity-90 mb-4">
-                  Be the first to invest in FaceBoobs and get exclusive early access
-                </p>
-
-                {/* CTA Button */}
-                <button
-                  onClick={() => {
-                    toast.success('🔔 You will be notified when the presale starts!');
-                  }}
-                  className="w-full bg-white text-purple-600 font-semibold py-3 px-6 rounded-lg hover:bg-purple-50 hover:scale-105 transition-all cursor-pointer shadow-md mb-3"
-                >
-                  Notify Me
-                </button>
-
-                {/* Coming Date Box - Small */}
-                <div className="bg-pink-100 text-purple-800 font-medium text-xs py-2 px-4 rounded-full inline-block">
-                  Coming December 2025
-                </div>
-              </div>
-            </div>
-
             <SuggestedProfiles />
           </div>
+
         )}
       </div>
 

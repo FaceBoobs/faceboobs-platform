@@ -119,7 +119,7 @@ const LikeButton = ({ contentId, className = "", size = 20 }) => {
       </span>
 
       {/* CSS for floating animation */}
-      <style jsx>{`
+      <style>{`
         @keyframes float-up {
           0% {
             transform: translateY(0) scale(1);

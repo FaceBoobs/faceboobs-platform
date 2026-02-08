@@ -1,12 +1,12 @@
 // src/components/CommentModal.js
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, MessageCircle, User } from 'lucide-react';
-import { useWeb3 } from '../contexts/Web3Context';
+import { useSolanaApp } from '../contexts/SolanaAppContext';
 import { SupabaseService } from '../services/supabaseService';
 import { useToast } from '../contexts/ToastContext';
 
 const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
-  const { account, user, getMediaUrl } = useWeb3();
+  const { account, user, getMediaUrl } = useSolanaApp();
   const { toast } = useToast();
 
   const [comments, setComments] = useState([]);
@@ -260,7 +260,7 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
                 {/* Avatar */}
                 <div className="flex-shrink-0">
                   {(() => {
-                    const avatarUrl = comment.users?.avatar_url || comment.avatar;
+                    const avatarUrl = comment.users?.avatar_url || comment.avatar_url;
                     const mediaSrc = avatarUrl ? getMediaUrl(avatarUrl) : null;
 
                     return mediaSrc ? (
@@ -277,7 +277,7 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
                   })()}
                   <div
                     className="w-10 h-10 bg-gradient-to-br from-pink-400 to-white rounded-full flex items-center justify-center"
-                    style={{ display: (comment.users?.avatar_url || comment.avatar) && getMediaUrl(comment.users?.avatar_url || comment.avatar) ? 'none' : 'flex' }}
+                    style={{ display: (comment.users?.avatar_url || comment.avatar_url) && getMediaUrl(comment.users?.avatar_url || comment.avatar_url) ? 'none' : 'flex' }}
                   >
                     <span className="text-pink-800 font-semibold text-sm">
                       {(comment.users?.username || comment.username || 'U').charAt(0).toUpperCase()}
@@ -389,7 +389,7 @@ const CommentModal = ({ isOpen, onClose, contentId, contentAuthor }) => {
       </div>
 
       {/* Custom CSS for animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes fade-in {
           from {
             opacity: 0;

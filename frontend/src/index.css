@@ -540,6 +540,25 @@ button[class*="purchase"],
   }
 }
 
+/* ===== FIX TEMPORANEO BARRA BIANCA - AGGRESSIVO ===== */
+/* Nasconde forzatamente la navbar duplicata in alto */
+div.hidden.md\\:block.fixed.top-0.left-56 {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+.fixed.top-0.left-56.right-0.bg-white {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Previeni tutte le barre bianche fixed in alto */
+div.fixed.top-0.bg-white:not(nav):not(header) {
+  display: none !important;
+}
+
 /* ===== MODAL STYLES - CRITICAL Z-INDEX ===== */
 /* Ensure modals are always on top */
 [role="dialog"],

@@ -1,14 +1,18 @@
 // src/pages/Earnings.js
 import React, { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
 import { DollarSign, TrendingUp, Download, ShoppingBag, AlertCircle, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { Transaction, SystemProgram, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useToast } from '../contexts/ToastContext';
 import { SupabaseService } from '../services/supabaseService';
+import { supabase } from '../supabaseClient';
 
 const Earnings = () => {
-  const { contract, user, account } = useWeb3();
+  const { user, account } = useWeb3(); // ✅ non usiamo contract (BNB/BSC)
+  const { publicKey, sendTransaction } = useWallet(); // 🔧 Solana wallet for withdrawals
+  const { connection } = useConnection(); // 🔧 Solana connection
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -20,143 +24,112 @@ const Earnings = () => {
   });
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [withdrawing, setWithdrawing] = useState(false);
-  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
+
+  // 🔧 WITHDRAW LIVE: State for withdrawal
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  // UI/labels
+  const CURRENCY = 'SOL';
 
   useEffect(() => {
-    // Check if user is a creator
-    if (user && !user.isCreator) {
+    const isCreator = !!(user?.isCreator ?? user?.is_creator);
+
+    if (user && !isCreator) {
       toast.error('Access denied. This page is for creators only.');
+      setLoading(false);
       navigate('/');
       return;
     }
 
-    if (contract && user && account) {
+    // 🔧 FIX: Check Solana wallet connection
+    if (user && (account || publicKey)) {
       loadEarningsData();
+      return;
     }
-  }, [contract, user, account]);
+
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, account, publicKey]);
 
   const loadEarningsData = async () => {
     try {
       setLoading(true);
-      console.log('📊 Loading earnings data for creator:', account);
 
-      // 1. Load total earned from Supabase (sum of all purchases)
-      const purchasesResult = await SupabaseService.getCreatorPurchases(account);
+      // 🔧 UPDATED: Load earnings from messagepurchases table (paid DMs)
+      const { data: messagePurchases, error: msgError } = await supabase
+        .from('messagepurchases')
+        .select('*')
+        .eq('creatoraddress', account?.toLowerCase());
 
       let totalEarnedFromDB = 0;
+      let alreadyWithdrawn = 0;
       let transactions = [];
 
-      if (purchasesResult.success && purchasesResult.data) {
-        console.log('💰 Found purchases:', purchasesResult.data.length);
+      if (!msgError && messagePurchases) {
+        // Calculate total earned (creator_received column has 98% already)
+        totalEarnedFromDB = messagePurchases.reduce((sum, purchase) => {
+          const creatorAmount = parseFloat(purchase.creator_received || 0);
+          return sum + creatorAmount;
+        }, 0);
 
-        // Calculate total earned (98% after platform fee)
-        totalEarnedFromDB = purchasesResult.data.reduce((sum, purchase) => {
-          const amount = parseFloat(purchase.amount);
+        // Calculate already withdrawn
+        alreadyWithdrawn = messagePurchases
+          .filter(p => p.withdrawn === true)
+          .reduce((sum, purchase) => {
+            return sum + parseFloat(purchase.creator_received || 0);
+          }, 0);
+
+        transactions = messagePurchases.map((purchase) => ({
+          id: purchase.id,
+          buyer: purchase.buyeraddress,
+          postId: purchase.messageid,
+          amount: purchase.amount,
+          transactionHash: purchase.transactionhash,
+          date: new Date(purchase.created_at),
+          withdrawn: purchase.withdrawn || false
+        }));
+      }
+
+      // Also load post purchases (existing functionality)
+      const purchasesResult = await SupabaseService.getCreatorPurchases(account);
+      if (purchasesResult.success && purchasesResult.data) {
+        const postEarnings = purchasesResult.data.reduce((sum, purchase) => {
+          const amount = parseFloat(purchase.amount || 0);
           return sum + (amount * 0.98); // 2% platform fee
         }, 0);
 
-        // Prepare transactions for display
-        transactions = purchasesResult.data.map(purchase => ({
+        totalEarnedFromDB += postEarnings;
+
+        const postTransactions = purchasesResult.data.map((purchase) => ({
           id: purchase.id,
           buyer: purchase.user_address,
           postId: purchase.post_id,
           amount: purchase.amount,
           transactionHash: purchase.transaction_hash,
-          date: new Date(purchase.created_at)
+          date: new Date(purchase.created_at),
+          withdrawn: false
         }));
+
+        transactions = [...transactions, ...postTransactions];
       }
 
-      // 2. Load available balance from blockchain (if contract available)
-      let availableBalance = '0';
-      try {
-        if (contract && contract.getUser) {
-          const userData = await contract.getUser(account);
-          availableBalance = ethers.formatEther(userData.totalEarnings);
-          console.log('💳 Available balance from contract:', availableBalance);
-        }
-      } catch (blockchainError) {
-        console.warn('⚠️ Could not load blockchain balance:', blockchainError);
-        // Continue with Supabase data even if blockchain fails
-      }
-
-      // 3. Calculate withdrawn amount
-      const alreadyWithdrawn = Math.max(0, totalEarnedFromDB - parseFloat(availableBalance));
+      // Available balance: total earned - already withdrawn
+      const availableBalance = Math.max(0, totalEarnedFromDB - alreadyWithdrawn);
 
       setEarnings({
         totalEarned: totalEarnedFromDB.toFixed(6),
-        availableBalance: availableBalance,
+        availableBalance: availableBalance.toFixed(6),
         alreadyWithdrawn: alreadyWithdrawn.toFixed(6),
-        totalSales: purchasesResult.data?.length || 0
-      });
-
-      setRecentTransactions(transactions.sort((a, b) => b.date - a.date));
-
-      console.log('✅ Earnings data loaded:', {
-        totalEarned: totalEarnedFromDB,
-        availableBalance,
-        alreadyWithdrawn,
         totalSales: transactions.length
       });
 
+      setRecentTransactions(transactions.sort((a, b) => b.date - a.date));
     } catch (error) {
       console.error('❌ Error loading earnings data:', error);
       toast.error('Failed to load earnings data');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleWithdrawClick = () => {
-    if (parseFloat(earnings.availableBalance) <= 0) {
-      toast.warning('No balance available to withdraw');
-      return;
-    }
-    setShowWithdrawConfirm(true);
-  };
-
-  const handleWithdrawConfirm = async () => {
-    if (!contract) {
-      toast.error('Contract not available. Please connect your wallet.');
-      return;
-    }
-
-    try {
-      setWithdrawing(true);
-      setShowWithdrawConfirm(false);
-
-      console.log('💸 Initiating withdrawal of', earnings.availableBalance, 'BNB');
-      toast.info('🔐 Please confirm the transaction in MetaMask...');
-
-      // Call withdrawEarnings() - withdraws all available balance
-      const tx = await contract.withdrawEarnings();
-
-      console.log('⏳ Transaction sent:', tx.hash);
-      toast.info('⏳ Transaction sent! Waiting for confirmation...');
-
-      // Wait for confirmation
-      const receipt = await tx.wait();
-      console.log('✅ Withdrawal confirmed:', receipt.hash);
-
-      toast.success(`🎉 Successfully withdrew ${earnings.availableBalance} BNB!`);
-
-      // Reload data
-      await loadEarningsData();
-
-    } catch (error) {
-      console.error('❌ Withdrawal failed:', error);
-
-      if (error.code === 4001) {
-        toast.error('Transaction cancelled by user');
-      } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        toast.error('Insufficient BNB for gas fees');
-      } else if (error.message?.includes('user rejected')) {
-        toast.error('Transaction rejected');
-      } else {
-        toast.error('Withdrawal failed: ' + (error.reason || error.message));
-      }
-    } finally {
-      setWithdrawing(false);
     }
   };
 
@@ -174,6 +147,130 @@ const Earnings = () => {
       hour: '2-digit',
       minute: '2-digit'
     }).format(date);
+  };
+
+  // 🔧 WITHDRAW LIVE: Functional withdrawal with amount input
+  const handleWithdraw = async () => {
+    try {
+      setIsWithdrawing(true);
+
+      if (!publicKey) {
+        toast.error('Please connect your Solana wallet');
+        setIsWithdrawing(false);
+        return;
+      }
+
+      // 🔧 FIX: Check Solana wallet connection
+      if (!account && !publicKey) {
+        toast.error('Wallet not connected');
+        setIsWithdrawing(false);
+        return;
+      }
+
+      // Validate withdraw amount
+      const amount = parseFloat(withdrawAmount);
+      if (!amount || amount <= 0) {
+        toast.error('Please enter a valid amount');
+        setIsWithdrawing(false);
+        return;
+      }
+
+      const available = parseFloat(earnings.availableBalance);
+      if (amount > available) {
+        toast.error(`Amount exceeds available balance (${available.toFixed(6)} SOL)`);
+        setIsWithdrawing(false);
+        return;
+      }
+
+      // Minimum withdrawal: 0.000001 SOL
+      if (amount < 0.000001) {
+        toast.error('Minimum withdrawal is 0.000001 SOL');
+        setIsWithdrawing(false);
+        return;
+      }
+
+      // Confirm with user
+      const confirmed = window.confirm(
+        `Withdraw ${amount.toFixed(6)} SOL to ${publicKey.toString()}?\n\n⚠️ Note: This will create a withdrawal request that requires backend processing to send actual SOL.`
+      );
+
+      if (!confirmed) {
+        setIsWithdrawing(false);
+        return;
+      }
+
+      toast.info('Processing withdrawal request...');
+
+      // 🔧 WITHDRAW LIVE: Save to withdraw_history table
+      const { data: withdrawData, error: withdrawError } = await supabase
+        .from('withdraw_history')
+        .insert([{
+          creator_address: publicKey.toString(),
+          amount: amount,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (withdrawError) {
+        console.error('Error creating withdrawal:', withdrawError);
+        throw withdrawError;
+      }
+
+      // Mark messagepurchases as withdrawn (up to the requested amount)
+      const { data: messagePurchases, error: fetchError } = await supabase
+        .from('messagepurchases')
+        .select('*')
+        .eq('creatoraddress', account.toLowerCase())
+        .eq('withdrawn', false)
+        .order('created_at', { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      // Calculate which purchases to mark as withdrawn
+      let remaining = amount;
+      const purchasesToMark = [];
+
+      for (const purchase of messagePurchases) {
+        if (remaining <= 0) break;
+        const purchaseAmount = parseFloat(purchase.creator_received || 0);
+        if (purchaseAmount <= remaining) {
+          purchasesToMark.push(purchase.id);
+          remaining -= purchaseAmount;
+        }
+      }
+
+      // Mark purchases as withdrawn
+      if (purchasesToMark.length > 0) {
+        const { error: updateError } = await supabase
+          .from('messagepurchases')
+          .update({
+            withdrawn: true,
+            withdrawn_at: new Date().toISOString(),
+            withdrawal_status: 'pending',
+            withdrawal_id: withdrawData.id
+          })
+          .in('id', purchasesToMark);
+
+        if (updateError) {
+          console.error('Error marking purchases as withdrawn:', updateError);
+          throw updateError;
+        }
+      }
+
+      toast.success(`✅ Withdrawal request submitted! ${amount.toFixed(6)} SOL (Request ID: ${withdrawData.id})`);
+
+      // Clear input and reload data
+      setWithdrawAmount('');
+      loadEarningsData();
+
+    } catch (error) {
+      console.error('❌ Withdraw error:', error);
+      toast.error('Failed to process withdrawal request');
+    } finally {
+      setIsWithdrawing(false);
+    }
   };
 
   if (loading) {
@@ -201,7 +298,7 @@ const Earnings = () => {
         className="rounded-xl text-white p-4 md:p-8 shadow-lg"
         style={{ background: 'linear-gradient(135deg, #d63bad 0%, #ff6bc9 50%, #ffe6f7 100%)' }}
       >
-        <h1 className="text-2xl md:text-4xl font-bold mb-2">💰 Creator Earnings</h1>
+        <h1 className="text-2xl md:text-4xl font-bold mb-2">Creator Earnings</h1>
         <p className="opacity-90 text-sm md:text-lg">Track your performance and manage your earnings</p>
       </div>
 
@@ -215,9 +312,10 @@ const Earnings = () => {
               <DollarSign className="text-green-600" size={16} />
             </div>
           </div>
-          <div className="text-lg md:text-3xl font-bold text-gray-900">{parseFloat(earnings.totalEarned).toFixed(4)}</div>
-          <div className="text-xs md:text-sm text-gray-500 mt-1">BNB (all time)</div>
-          <div className="text-xs text-gray-400 mt-1 md:mt-2 hidden md:block">≈ ${(parseFloat(earnings.totalEarned) * 300).toFixed(2)} USD</div>
+          <div className="text-lg md:text-3xl font-bold text-gray-900">
+            {parseFloat(earnings.totalEarned).toFixed(4)}
+          </div>
+          <div className="text-xs md:text-sm text-gray-500 mt-1">{CURRENCY} (all time)</div>
         </div>
 
         {/* Available Balance */}
@@ -228,9 +326,13 @@ const Earnings = () => {
               <TrendingUp className="text-blue-600" size={16} />
             </div>
           </div>
-          <div className="text-lg md:text-3xl font-bold text-blue-600">{parseFloat(earnings.availableBalance).toFixed(4)}</div>
-          <div className="text-xs md:text-sm text-gray-500 mt-1">BNB</div>
-          <div className="text-xs text-green-600 mt-1 md:mt-2 font-medium hidden md:block">Ready to withdraw</div>
+          <div className="text-lg md:text-3xl font-bold text-blue-600">
+            {parseFloat(earnings.availableBalance).toFixed(4)}
+          </div>
+          <div className="text-xs md:text-sm text-gray-500 mt-1">{CURRENCY}</div>
+          <div className="text-xs text-gray-400 mt-1 md:mt-2 font-medium hidden md:block">
+            Ready to withdraw
+          </div>
         </div>
 
         {/* Already Withdrawn */}
@@ -241,8 +343,10 @@ const Earnings = () => {
               <CheckCircle className="text-purple-600" size={16} />
             </div>
           </div>
-          <div className="text-lg md:text-3xl font-bold text-gray-900">{parseFloat(earnings.alreadyWithdrawn).toFixed(4)}</div>
-          <div className="text-xs md:text-sm text-gray-500 mt-1">BNB</div>
+          <div className="text-lg md:text-3xl font-bold text-gray-900">
+            {parseFloat(earnings.alreadyWithdrawn).toFixed(4)}
+          </div>
+          <div className="text-xs md:text-sm text-gray-500 mt-1">{CURRENCY}</div>
         </div>
 
         {/* Total Sales */}
@@ -258,33 +362,80 @@ const Earnings = () => {
         </div>
       </div>
 
-      {/* Withdraw Section */}
+      {/* 🔧 WITHDRAW LIVE: Functional withdraw section with amount input */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-          <div className="flex-1">
-            <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-2">Withdraw Earnings</h3>
-            <p className="text-sm md:text-base text-gray-600">
-              You have <span className="font-bold text-green-600">{parseFloat(earnings.availableBalance).toFixed(4)} BNB</span> available
+        <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">Withdraw Earnings</h3>
+
+        <div className="space-y-4">
+          {/* Available Balance Display */}
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+            <p className="text-sm text-gray-600 mb-1">Available Balance</p>
+            <p className="text-3xl font-bold text-green-600">
+              {parseFloat(earnings.availableBalance).toFixed(6)} {CURRENCY}
             </p>
-            <p className="text-xs md:text-sm text-gray-500 mt-1">
-              Platform fee: 2% • You receive: 98%
+            <p className="text-xs text-gray-500 mt-1">Ready to withdraw</p>
+          </div>
+
+          {/* Withdraw Amount Input */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Withdraw Amount ({CURRENCY})
+            </label>
+            <div className="flex gap-3">
+              <div className="flex-1 relative">
+                <input
+                  type="number"
+                  step="0.000001"
+                  min="0.000001"
+                  max={parseFloat(earnings.availableBalance)}
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  placeholder="0.000000"
+                  disabled={parseFloat(earnings.availableBalance) <= 0 || isWithdrawing}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-lg font-mono"
+                />
+                <button
+                  onClick={() => setWithdrawAmount(earnings.availableBalance)}
+                  disabled={parseFloat(earnings.availableBalance) <= 0 || isWithdrawing}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 text-xs font-semibold text-purple-600 hover:text-purple-700 disabled:text-gray-400"
+                >
+                  MAX
+                </button>
+              </div>
+
+              <button
+                onClick={handleWithdraw}
+                disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || isWithdrawing || parseFloat(earnings.availableBalance) <= 0}
+                className={`px-6 py-3 rounded-lg transition-all flex items-center justify-center space-x-2 font-semibold shadow-lg whitespace-nowrap ${
+                  withdrawAmount && parseFloat(withdrawAmount) > 0 && !isWithdrawing && parseFloat(earnings.availableBalance) > 0
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 hover:shadow-xl'
+                    : 'bg-gray-200 text-gray-600 opacity-70 cursor-not-allowed'
+                }`}
+              >
+                {isWithdrawing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={20} />
+                    <span>Withdraw {withdrawAmount ? parseFloat(withdrawAmount).toFixed(6) : ''} {CURRENCY}</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Min: 0.000001 {CURRENCY} • Platform fee: 2% • You receive: 98%
             </p>
           </div>
-          <button
-            onClick={handleWithdrawClick}
-            disabled={withdrawing || parseFloat(earnings.availableBalance) <= 0}
-            className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2 font-semibold shadow-lg text-sm md:text-base w-full md:w-auto"
-          >
-            <Download size={20} />
-            <span>{withdrawing ? 'Processing...' : 'Withdraw All'}</span>
-          </button>
         </div>
 
         {parseFloat(earnings.availableBalance) <= 0 && (
           <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start space-x-3">
             <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
             <div className="text-sm text-yellow-800">
-              <strong>No balance available.</strong> Create premium content and get sales to earn BNB!
+              <strong>No balance available.</strong> Create premium content and get sales to earn {CURRENCY}!
             </div>
           </div>
         )}
@@ -308,24 +459,12 @@ const Earnings = () => {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Buyer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Post ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Your Cut (98%)
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Transaction
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buyer</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Post ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Your Cut (98%)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -334,7 +473,7 @@ const Earnings = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full flex items-center justify-center text-white font-semibold text-xs">
-                          {tx.buyer.slice(2, 4).toUpperCase()}
+                          {tx.buyer?.slice(2, 4)?.toUpperCase?.() || '??'}
                         </div>
                         <div className="ml-3">
                           <div className="text-sm font-medium text-gray-900">{formatAddress(tx.buyer)}</div>
@@ -347,24 +486,15 @@ const Earnings = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                      {parseFloat(tx.amount).toFixed(4)} BNB
+                      {parseFloat(tx.amount).toFixed(4)} {CURRENCY}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                      {(parseFloat(tx.amount) * 0.98).toFixed(4)} BNB
+                      {(parseFloat(tx.amount) * 0.98).toFixed(4)} {CURRENCY}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(tx.date)}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(tx.date)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {tx.transactionHash ? (
-                        <a
-                          href={`https://testnet.bscscan.com/tx/${tx.transactionHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 hover:underline"
-                        >
-                          View →
-                        </a>
+                        <span className="text-gray-500">{tx.transactionHash.slice(0, 8)}...</span>
                       ) : (
                         <span className="text-gray-400">-</span>
                       )}
@@ -376,38 +506,6 @@ const Earnings = () => {
           </div>
         )}
       </div>
-
-      {/* Withdraw Confirmation Modal */}
-      {showWithdrawConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
-          <div className="bg-white rounded-t-xl md:rounded-xl w-full md:max-w-md p-4 md:p-6 shadow-2xl">
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4">Confirm Withdrawal</h3>
-            <p className="text-sm md:text-base text-gray-600 mb-4 md:mb-6">
-              You are about to withdraw <span className="font-bold text-green-600">{parseFloat(earnings.availableBalance).toFixed(4)} BNB</span> to your wallet.
-            </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4 mb-4 md:mb-6">
-              <p className="text-xs md:text-sm text-blue-800">
-                <strong>Note:</strong> This will send all your available earnings to your connected wallet address.
-                Gas fees will be deducted from your wallet balance.
-              </p>
-            </div>
-            <div className="flex flex-col md:flex-row gap-3 md:space-x-4">
-              <button
-                onClick={() => setShowWithdrawConfirm(false)}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm md:text-base"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleWithdrawConfirm}
-                className="flex-1 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-sm md:text-base"
-              >
-                Confirm Withdraw
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

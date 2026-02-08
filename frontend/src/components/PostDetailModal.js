@@ -1,18 +1,26 @@
 // src/components/PostDetailModal.js
 import React, { useState, useEffect } from 'react';
 import { X, MessageCircle, Lock } from 'lucide-react';
-import { useWeb3 } from '../contexts/Web3Context';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { Transaction, SystemProgram, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { useSolanaApp } from '../contexts/SolanaAppContext';
 import { useToast } from '../contexts/ToastContext';
 import { useComments } from '../contexts/CommentsContext';
 import { SupabaseService } from '../services/supabaseService';
-import { ethers } from 'ethers';
 import LikeButton from './LikeButton';
 import ShareButton from './ShareButton';
+import { supabase } from '../supabaseClient';
+import { PLATFORM_CONFIG, calculateFees, formatFeeBreakdown } from '../config/platform';
 
 const PostDetailModal = ({ isOpen, onClose, content }) => {
-  const { user, getMediaUrl, contract, account } = useWeb3();
+  const { user, getMediaUrl, account } = useSolanaApp();
   const { toast } = useToast();
   const { getComments, addComment } = useComments();
+
+  // Solana wallet hooks for split payments
+  const { publicKey, sendTransaction } = useWallet();
+  const { connection } = useConnection();
+
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
@@ -29,7 +37,8 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
       }
 
       try {
-        const result = await SupabaseService.checkContentAccess(account, content.id);
+        const normalizedAccount = account.toLowerCase();
+        const result = await SupabaseService.checkContentAccess(normalizedAccount, content.id);
         setHasAccess(result.success ? result.hasAccess : false);
       } catch (error) {
         console.error('Error checking content access:', error);
@@ -95,106 +104,92 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
   };
 
   const handlePurchase = async () => {
-    if (!contract || !account || !content) {
-      toast.error('Please connect your wallet first.');
+    if (!content || !account) {
+      toast.error('Please connect your wallet');
       return;
     }
 
-    // Check if blockchain content ID exists
-    if (!content.blockchainContentId) {
-      console.error('❌ No blockchain content ID found for this post');
-      toast.error('This post is not registered on blockchain. Cannot purchase.');
+    if (!content.price || Number(content.price) <= 0) {
+      toast.error('Invalid content price');
       return;
     }
+
+    // Calculate fees using platform config
+    const priceSOL = Number(content.price);
+    const fees = calculateFees(priceSOL);
+
+    const confirmed = window.confirm(
+      `Purchase access to this premium content for ${fees.total} SOL?\n\n` +
+      formatFeeBreakdown(fees.total)
+    );
+    if (!confirmed) return;
 
     try {
       setPurchasing(true);
 
-      // Convert price from BNB to Wei
-      // content.price comes as string like "9.996" (in BNB) from database
-      const priceInWei = ethers.parseEther(content.price.toString());
-      console.log('💰 Price conversion:', {
-        priceInBNB: content.price,
-        priceInWei: priceInWei.toString()
-      });
+      toast.info('Processing payment with split (98% creator, 2% platform)...');
 
-      // Step 1: Call smart contract to purchase content
-      console.log('🛒 Purchasing content from modal...', {
-        supabaseId: content.id,
-        blockchainContentId: content.blockchainContentId,
-        price: content.price
-      });
-      toast.info('🔐 Opening MetaMask for transaction confirmation...');
-
-      const tx = await contract.buyContent(content.blockchainContentId, {
-        value: priceInWei, // Pass Wei value to contract
-        gasLimit: 300000
-      });
-
-      console.log('⏳ Transaction sent:', tx.hash);
-      toast.info('⏳ Transaction sent! Waiting for confirmation...');
-
-      // Step 2: Wait for transaction confirmation
-      const receipt = await tx.wait();
-      console.log('✅ Transaction confirmed:', receipt);
-
-      // Step 3: Save purchase to Supabase
-      console.log('💾 Saving purchase to Supabase...');
-      const purchaseData = {
-        user_address: account.toLowerCase(),
-        post_id: parseInt(content.id), // Save Supabase post ID
-        amount: content.price.toString(), // Save original price in BNB
-        transaction_hash: receipt.hash,
-        created_at: new Date().toISOString()
-      };
-
-      const saveResult = await SupabaseService.createPurchase(purchaseData);
-
-      if (!saveResult.success) {
-        console.error('⚠️ Failed to save purchase to Supabase:', saveResult.error);
-        toast.warning('Content purchased but failed to sync with database');
-      } else {
-        console.log('✅ Purchase saved to Supabase:', saveResult.data);
+      if (!publicKey) {
+        throw new Error('Wallet not connected');
       }
 
-      // Step 4: Update local state to unlock content
+      // Create transaction with 2 transfers
+      const transaction = new Transaction();
+
+      // 1. Pay creator (98%)
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: new PublicKey(content.creator_address),
+          lamports: Math.floor(fees.creatorAmount * LAMPORTS_PER_SOL),
+        })
+      );
+
+      // 2. Platform commission (2%)
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: PLATFORM_CONFIG.WALLET_ADDRESS,
+          lamports: Math.floor(fees.platformFee * LAMPORTS_PER_SOL),
+        })
+      );
+
+      // Send transaction
+      const signature = await sendTransaction(transaction, connection);
+
+      toast.info('Confirming transaction...');
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      toast.info('Recording purchase...');
+
+      // Record purchase with fee breakdown
+      const { error: purchaseError } = await supabase.from('postpurchases').insert({
+        post_id: content.id,
+        buyer_address: publicKey.toString(),
+        creator_address: content.creator_address,
+        amount_paid: fees.total,
+        platform_fee: fees.platformFee,
+        creator_received: fees.creatorAmount,
+        transaction_signature: signature,
+        blockchain: 'solana'
+      });
+
+      if (purchaseError && purchaseError.code !== '23505') {
+        throw purchaseError;
+      }
+
+      toast.success('Content unlocked! Payment split completed.');
+
+      // Refresh access status
       setHasAccess(true);
+    } catch (e) {
+      console.error('Purchase failed:', e);
 
-      // Step 5: Create notification for the post creator
-      try {
-        // Don't create notification if user buys their own content
-        if (content.creator && content.creator.toLowerCase() !== account.toLowerCase()) {
-          const notificationData = {
-            user_address: content.creator.toLowerCase(),
-            type: 'purchase',
-            title: 'New Purchase',
-            message: `${user?.username || `User${account.substring(0, 6)}`} purchased your content for ${content.price} BNB`,
-            post_id: parseInt(content.id),
-            from_user_address: account.toLowerCase(),
-            from_username: user?.username || `User${account.substring(0, 6)}`
-          };
-
-          await SupabaseService.createNotification(notificationData);
-          console.log('✅ Purchase notification created');
-        }
-      } catch (notifError) {
-        console.error('Failed to create purchase notification:', notifError);
-        // Don't fail the purchase operation if notification fails
-      }
-
-      toast.success('🎉 Content purchased successfully!');
-
-    } catch (error) {
-      console.error('❌ Purchase failed:', error);
-
-      if (error.code === 4001) {
-        toast.error('Transaction cancelled by user');
-      } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        toast.error('Insufficient BNB balance');
-      } else if (error.message?.includes('user rejected')) {
-        toast.error('Transaction rejected');
+      const msg = e?.message || String(e);
+      if (msg.toLowerCase().includes('rejected') || msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('user rejected')) {
+        toast.info('Transaction cancelled');
       } else {
-        toast.error('Purchase failed: ' + (error.reason || error.message));
+        toast.error(msg || 'Failed to purchase content');
       }
     } finally {
       setPurchasing(false);
@@ -286,7 +281,7 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
                   <Lock size={48} className="mx-auto mb-4" />
                   <h3 className="text-2xl font-bold mb-2">Premium Content</h3>
                   <p className="text-sm opacity-90 mb-6">
-                    Unlock this exclusive content for {content.price} BNB
+                    Unlock this exclusive content for {content.price} SOL
                   </p>
                   <button
                     onClick={handlePurchase}
@@ -300,7 +295,7 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
                       touchAction: 'manipulation'
                     }}
                   >
-                    {purchasing ? 'Purchasing...' : `Buy for ${content.price} BNB`}
+                    {purchasing ? 'Purchasing...' : `Buy for ${content.price} SOL`}
                   </button>
                 </div>
               </div>
@@ -386,7 +381,7 @@ const PostDetailModal = ({ isOpen, onClose, content }) => {
               <div className="flex items-center space-x-2 text-purple-700">
                 <Lock size={16} />
                 <span className="text-sm font-medium">
-                  Premium Content - {content.price} BNB
+                  Premium Content - {content.price} SOL
                 </span>
               </div>
             </div>

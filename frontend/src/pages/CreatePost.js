@@ -1,14 +1,13 @@
 // src/pages/CreatePost.js
 import React, { useState } from 'react';
 import { Upload, DollarSign, Lock, Globe, ArrowLeft, Sparkles, X, Zap } from 'lucide-react';
-import { ethers } from 'ethers';
-import { useWeb3 } from '../contexts/Web3Context';
+import { useSolanaApp } from '../contexts/SolanaAppContext';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import { SupabaseService } from '../services/supabaseService';
 
 const CreatePost = () => {
-  const { account, user, contract } = useWeb3();
+  const { account, user } = useSolanaApp();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -139,9 +138,12 @@ const CreatePost = () => {
       const contentHash = `content_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       const contentId = Math.floor(Math.random() * 2147483647);
 
+      const normalizedAddress = account.toLowerCase();
+      console.log('📝 Creating post with Solana address:', normalizedAddress);
+
       const postData = {
         content_id: contentId,
-        creator_address: account,
+        creator_address: normalizedAddress,
         username: user?.username || `User${account.substring(0, 6)}`,
         description: formData.description || '',
         content_hash: contentHash,
@@ -152,63 +154,14 @@ const CreatePost = () => {
         purchase_count: 0
       };
 
+      console.log('💾 Saving post to Supabase...', postData);
       const result = await SupabaseService.createPost(postData);
 
       if (!result.success) {
         throw new Error('Failed to save post: ' + result.error);
       }
 
-      if (contract && formData.isPaid) {
-        try {
-          toast.info('⏳ Please confirm the transaction in MetaMask...');
-          const priceInWei = ethers.parseEther(formData.price.toString());
-          const tx = await contract.createContent(contentHash, priceInWei, formData.isPaid);
-          toast.info('⏳ Transaction sent! Waiting for confirmation...');
-          const receipt = await tx.wait();
-
-          let blockchainContentId = null;
-          try {
-            const contentCreatedEvent = receipt.logs.find(log => {
-              try {
-                const parsed = contract.interface.parseLog(log);
-                return parsed && parsed.name === 'ContentCreated';
-              } catch (e) {
-                return false;
-              }
-            });
-
-            if (contentCreatedEvent) {
-              const parsed = contract.interface.parseLog(contentCreatedEvent);
-              blockchainContentId = parsed.args.contentId.toString();
-            }
-          } catch (eventError) {
-            console.error('Error parsing ContentCreated event:', eventError);
-          }
-
-          if (blockchainContentId) {
-            await SupabaseService.updatePost(result.data.id, {
-              blockchain_content_id: blockchainContentId
-            });
-            toast.success(`✅ Post registered on blockchain!`);
-          }
-
-        } catch (blockchainError) {
-          if (blockchainError.code === 4001) {
-            toast.error('Transaction cancelled. Post saved but not registered on blockchain.');
-          } else if (blockchainError.code === 'INSUFFICIENT_FUNDS') {
-            toast.error('Insufficient BNB for gas fees.');
-          } else {
-            toast.warning('⚠️ Post saved but blockchain registration failed.');
-          }
-        }
-      } else if (contract && !formData.isPaid) {
-        try {
-          const tx = await contract.createContent(contentHash, 0, false);
-          await tx.wait();
-        } catch (blockchainError) {
-          console.warn('Blockchain registration failed for free content:', blockchainError);
-        }
-      }
+      console.log('✅ Post saved successfully!', result.data);
 
       triggerConfetti();
       toast.success('✅ Post created successfully!');
@@ -257,19 +210,13 @@ const CreatePost = () => {
 
       const contentHash = `story_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-      if (contract && contract.createStory) {
-        try {
-          const tx = await contract.createStory(contentHash);
-          await tx.wait();
-        } catch (blockchainError) {
-          console.warn('Blockchain transaction failed:', blockchainError);
-        }
-      }
+      const normalizedAddress = account.toLowerCase();
+      console.log('📝 Creating story with Solana address:', normalizedAddress);
 
       const expiryTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       const storyData = {
-        creator_address: account,
+        creator_address: normalizedAddress,
         username: user?.username || `User${account.substring(0, 6)}`,
         content: formData.description || '',
         content_hash: contentHash,
@@ -277,6 +224,7 @@ const CreatePost = () => {
         expires_at: expiryTime.toISOString()
       };
 
+      console.log('💾 Saving story to Supabase...', storyData);
       const result = await SupabaseService.createStory(storyData);
 
       if (!result.success) {
@@ -469,21 +417,21 @@ const CreatePost = () => {
           {formData.isPaid && (
             <div className="mt-4 animate-fadeIn">
               <div className="bg-white/80 backdrop-blur-sm border border-purple-300 rounded-2xl p-4 shadow-lg">
-                <label className="block text-sm font-semibold text-gray-800 mb-2">Price in BNB</label>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">Price in SOL</label>
                 <div className="relative">
                   <DollarSign size={20} className="absolute left-3 top-3 text-purple-600" />
                   <input
                     type="number"
-                    step="0.001"
-                    min="0.001"
+                    step="0.0001"
+                    min="0.0001"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    placeholder="0.001"
+                    placeholder="0.0001"
                     className="w-full pl-10 pr-4 py-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
                   />
                 </div>
                 <p className="text-xs font-light text-gray-600 mt-2">
-                  Minimum: 0.001 BNB • Platform fee: 2%
+                  Minimum: 0.0001 SOL • Platform fee: 2%
                 </p>
               </div>
             </div>
@@ -683,21 +631,21 @@ const CreatePost = () => {
                   {/* Price Input */}
                   {formData.isPaid && (
                     <div className="animate-fadeIn">
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">Price in BNB</label>
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">Price in SOL</label>
                       <div className="relative">
                         <DollarSign size={20} className="absolute left-4 top-4 text-purple-600" />
                         <input
                           type="number"
-                          step="0.001"
-                          min="0.001"
+                          step="0.0001"
+                          min="0.0001"
                           value={formData.price}
                           onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                          placeholder="0.001"
+                          placeholder="0.0001"
                           className="w-full pl-12 pr-4 py-3 border-2 border-purple-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-white/50 backdrop-blur-sm"
                         />
                       </div>
                       <p className="text-sm font-light text-gray-600 mt-2">
-                        Minimum: 0.001 BNB • Platform fee: 2%
+                        Minimum: 0.0001 SOL • Platform fee: 2%
                       </p>
                     </div>
                   )}
@@ -759,7 +707,7 @@ const CreatePost = () => {
       </div>
 
       {/* Custom CSS for animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes confetti {
           0% {
             transform: translateY(0) rotate(0deg);

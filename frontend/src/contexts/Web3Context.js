@@ -4,10 +4,13 @@ import CONTRACT_ABI from '../contracts/SocialPlatform.json';
 import { SupabaseService } from '../services/supabaseService';
 import { supabase } from '../supabaseClient';
 
+
 const CONTRACT_ADDRESS = "0x575e0532445489dd31C12615BeC7C63d737B69DD";
 const BSC_TESTNET_CHAIN_ID = 97;
 
+
 const Web3Context = createContext();
+
 
 export const useWeb3 = () => {
   const context = useContext(Web3Context);
@@ -16,6 +19,16 @@ export const useWeb3 = () => {
   }
   return context;
 };
+
+
+// ✅ FIX: Helper function to get Solana wallet address
+const getSolanaWalletAddress = () => {
+  if (window.solana && window.solana.publicKey) {
+    return window.solana.publicKey.toString();
+  }
+  return null;
+};
+
 
 export const Web3Provider = ({ children }) => {
   const [provider, setProvider] = useState(null);
@@ -28,6 +41,7 @@ export const Web3Provider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [contractError, setContractError] = useState(null);
 
+
   // Initialize Web3
   useEffect(() => {
     const initializeWeb3 = async () => {
@@ -35,11 +49,13 @@ export const Web3Provider = ({ children }) => {
         const web3Provider = new ethers.BrowserProvider(window.ethereum);
         setProvider(web3Provider);
 
+
         // Listen for network changes
         window.ethereum.on('chainChanged', (chainId) => {
           setNetworkId(parseInt(chainId, 16));
           window.location.reload();
         });
+
 
         // Listen for account changes
         window.ethereum.on('accountsChanged', (accounts) => {
@@ -50,13 +66,16 @@ export const Web3Provider = ({ children }) => {
           }
         });
 
+
         // Check if already connected
         checkConnection();
       }
     };
 
+
     initializeWeb3();
   }, []);
+
 
   const checkConnection = async () => {
     try {
@@ -66,9 +85,11 @@ export const Web3Provider = ({ children }) => {
           setAccount(accounts[0]);
           setIsConnected(true);
 
+
           const web3Provider = new ethers.BrowserProvider(window.ethereum);
           const network = await web3Provider.getNetwork();
           setNetworkId(Number(network.chainId));
+
 
           if (Number(network.chainId) === BSC_TESTNET_CHAIN_ID) {
             await initializeContract(web3Provider, accounts[0]);
@@ -83,39 +104,20 @@ export const Web3Provider = ({ children }) => {
     }
   };
 
+
   const connectWallet = async () => {
     try {
       setLoading(true);
       setContractError(null);
 
-      if (!window.ethereum) {
-        throw new Error('Please install MetaMask to connect your wallet.');
-      }
 
-      const web3Provider = new ethers.BrowserProvider(window.ethereum);
-      setProvider(web3Provider);
+      // Note: Wallet connection is now handled by SolanaWalletProvider
+      // This function is kept for backward compatibility but does nothing
+      console.log('⚠️ connectWallet called but BSC support has been removed. Use Solana wallet instead.');
 
-      const accounts = await window.ethereum.request({
-        method: 'eth_requestAccounts'
-      });
 
-      const userAccount = accounts[0];
-      setAccount(userAccount);
-      setIsConnected(true);
-
-      const network = await web3Provider.getNetwork();
-      setNetworkId(Number(network.chainId));
-
-      if (Number(network.chainId) !== BSC_TESTNET_CHAIN_ID) {
-        await switchToBSCTestnet();
-        const updatedNetwork = await web3Provider.getNetwork();
-        if (Number(updatedNetwork.chainId) !== BSC_TESTNET_CHAIN_ID) {
-          throw new Error(`Failed to switch to BSC Testnet. Current chain ID: ${Number(updatedNetwork.chainId)}`);
-        }
-      }
-
-      await initializeContract(web3Provider, userAccount);
       setLoading(false);
+
 
     } catch (error) {
       console.error('Error connecting wallet:', error);
@@ -123,6 +125,7 @@ export const Web3Provider = ({ children }) => {
       throw error;
     }
   };
+
 
   const disconnectWallet = async () => {
     setAccount(null);
@@ -134,46 +137,17 @@ export const Web3Provider = ({ children }) => {
     console.log('✅ Wallet disconnected');
   };
 
-  const switchToBSCTestnet = async () => {
-    try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x61' }],
-      });
-    } catch (switchError) {
-      if (switchError.code === 4902) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0x61',
-              chainName: 'BSC Testnet',
-              nativeCurrency: {
-                name: 'BNB',
-                symbol: 'BNB',
-                decimals: 18,
-              },
-              rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545'],
-              blockExplorerUrls: ['https://testnet.bscscan.com'],
-            }],
-          });
-        } catch (addError) {
-          throw addError;
-        }
-      } else {
-        throw switchError;
-      }
-    }
-  };
 
   const initializeContract = async (web3Provider, userAccount) => {
     try {
       console.log('🔧 ========== INITIALIZING CONTRACT ==========');
       console.log('🔧 User account:', userAccount);
 
+
       const web3Signer = await web3Provider.getSigner();
       setSigner(web3Signer);
       console.log('✅ Signer created');
+
 
       const contractInstance = new ethers.Contract(
         CONTRACT_ADDRESS,
@@ -181,30 +155,37 @@ export const Web3Provider = ({ children }) => {
         web3Signer
       );
 
+
       setContract(contractInstance);
       setContractError(null);
       console.log('✅ Contract instance created');
 
+
       if (userAccount) {
         console.log('🔄 Starting user initialization flow...');
+
 
         // STEP 1: FIRST ensure user exists in Supabase with valid username
         console.log('📝 Step 1: Check/Create user in Supabase...');
         await checkOrCreateSupabaseUser(userAccount);
         console.log('✅ Step 1 complete');
 
+
         // STEP 2: THEN auto-register on blockchain (using Supabase data)
         console.log('⛓️ Step 2: Auto-register on blockchain...');
         await autoRegisterOnBlockchain(contractInstance, userAccount);
         console.log('✅ Step 2 complete');
+
 
         // STEP 3: FINALLY load user data from Supabase
         console.log('📊 Step 3: Load user data...');
         await loadUserData(userAccount);
         console.log('✅ Step 3 complete');
 
+
         console.log('🎉 User initialization complete!');
       }
+
 
       console.log('✅ Contract initialized successfully');
       console.log('🔧 ========== INITIALIZATION COMPLETE ==========');
@@ -220,6 +201,7 @@ export const Web3Provider = ({ children }) => {
     }
   };
 
+
   const autoRegisterOnBlockchain = async (contractInstance, userAddress) => {
     try {
       console.log('🔍 ========== AUTO-REGISTER BLOCKCHAIN DEBUG ==========');
@@ -227,9 +209,11 @@ export const Web3Provider = ({ children }) => {
       console.log('🔍 User address:', userAddress);
       console.log('🔍 Contract address:', CONTRACT_ADDRESS);
 
+
       // Check if user exists on blockchain using users mapping
       const userOnBlockchain = await contractInstance.users(userAddress);
       const isRegistered = userOnBlockchain.exists;
+
 
       console.log('📊 Blockchain registration status:', {
         exists: isRegistered,
@@ -238,11 +222,20 @@ export const Web3Provider = ({ children }) => {
         address: userAddress
       });
 
+
       if (!isRegistered) {
         console.log('📝 User NOT registered on blockchain, checking Supabase...');
 
+
+        // ✅ FIX: Get Solana wallet address if available
+        const solanaAddress = getSolanaWalletAddress();
+        const addressToCheck = solanaAddress || userAddress;
+
+        console.log('🔍 Checking Supabase with address:', addressToCheck);
+
         // Get user data from Supabase
-        const { data: userData, success } = await SupabaseService.getUser(userAddress);
+        const { data: userData, success } = await SupabaseService.getUser(addressToCheck);
+
 
         console.log('📊 Supabase user data:', {
           success,
@@ -252,13 +245,15 @@ export const Web3Provider = ({ children }) => {
           avatar_url: userData?.avatar_url || '(none)'
         });
 
+
         if (success && userData) {
           // Generate default username if missing
           let username = userData.username;
           if (!username || username.trim() === '') {
-            username = `User_${userAddress.substring(0, 8)}`;
+            username = `User_${addressToCheck.substring(0, 8)}`;
             console.log('⚠️ No username in Supabase, using default:', username);
           }
+
 
           // Validate username is not empty
           if (!username || username.trim() === '') {
@@ -266,12 +261,14 @@ export const Web3Provider = ({ children }) => {
             return;
           }
 
+
           console.log('✅ Proceeding with blockchain registration...');
           console.log('📋 Registration parameters:', {
             username: username,
             avatarHash: userData.avatar_url || 'QmDefaultAvatar',
             bio: userData.bio || ''
           });
+
 
           try {
             // Call registerUser with required parameters
@@ -283,6 +280,7 @@ export const Web3Provider = ({ children }) => {
             console.log('⏳ Registration transaction sent:', tx.hash);
             console.log('⏳ Waiting for blockchain confirmation...');
 
+
             const receipt = await tx.wait();
             console.log('✅ Transaction confirmed:', {
               hash: receipt.hash,
@@ -291,7 +289,9 @@ export const Web3Provider = ({ children }) => {
               gasUsed: receipt.gasUsed?.toString()
             });
 
+
             console.log('✅ User registered on blockchain successfully!');
+
 
             // Verify registration
             const userAfterReg = await contractInstance.users(userAddress);
@@ -350,13 +350,20 @@ export const Web3Provider = ({ children }) => {
     }
   };
 
+
   const loadUserData = async (userAccount) => {
     try {
       console.log('🔍 ========== LOADING USER DATA ==========');
-      console.log('🔍 Loading user data from Supabase for:', userAccount);
+
+      // ✅ FIX: Get Solana wallet address if available
+      const solanaAddress = getSolanaWalletAddress();
+      const addressToLoad = solanaAddress || userAccount;
+
+      console.log('🔍 Loading user data from Supabase for:', addressToLoad);
 
       // Load user data from Supabase ONLY
-      const { data: userData, success } = await SupabaseService.getUser(userAccount);
+      const { data: userData, success } = await SupabaseService.getUser(addressToLoad);
+
 
       console.log('📊 Load user result:', {
         success,
@@ -364,10 +371,11 @@ export const Web3Provider = ({ children }) => {
         username: userData?.username || '(none)'
       });
 
+
       if (success && userData) {
         // User exists in Supabase
         const userObj = {
-          address: userAccount,
+          address: addressToLoad,
           username: userData.username || null,
           avatarHash: userData.avatar_url || 'QmDefaultAvatar',
           bio: userData.bio || '',
@@ -376,6 +384,7 @@ export const Web3Provider = ({ children }) => {
           followingCount: userData.following_count || 0,
           totalEarnings: '0' // Earnings are only tracked on blockchain
         };
+
 
         setUser(userObj);
         console.log('✅ User data loaded from Supabase:', {
@@ -399,13 +408,27 @@ export const Web3Provider = ({ children }) => {
     }
   };
 
+
   const checkOrCreateSupabaseUser = async (walletAddress) => {
     try {
       console.log('🔍 ========== CHECK/CREATE SUPABASE USER DEBUG ==========');
-      console.log('🔍 Checking if user exists in Supabase...');
-      console.log('🔍 Wallet address:', walletAddress);
 
-      const { data: existingUser, success: getUserSuccess } = await SupabaseService.getUser(walletAddress.toLowerCase());
+      // ✅ FIX: Use Solana wallet if available, otherwise fall back to Ethereum
+      const solanaAddress = getSolanaWalletAddress();
+      const addressToUse = solanaAddress || walletAddress;
+
+      console.log('🔍 Wallet addresses:', {
+        ethereum: walletAddress,
+        solana: solanaAddress,
+        using: addressToUse
+      });
+
+      console.log('🔍 Checking if user exists in Supabase...');
+      console.log('🔍 Wallet address:', addressToUse);
+
+
+      const { data: existingUser, success: getUserSuccess } = await SupabaseService.getUser(addressToUse.toLowerCase());
+
 
       console.log('📊 Supabase check result:', {
         success: getUserSuccess,
@@ -413,16 +436,19 @@ export const Web3Provider = ({ children }) => {
         username: existingUser?.username || '(none)'
       });
 
+
       if (!existingUser) {
         console.log('📝 User does NOT exist in Supabase, creating new record...');
 
+
         // Generate default username from wallet address
-        const defaultUsername = `User_${walletAddress.substring(0, 8)}`;
+        const defaultUsername = `User_${addressToUse.substring(0, 8)}`;
         console.log('📝 Using default username:', defaultUsername);
 
+
         const newUserData = {
-          wallet_address: walletAddress.toLowerCase(),
-          username: defaultUsername, // FIX: Use default username instead of null
+          wallet_address: addressToUse.toLowerCase(), // ✅ FIX: Now uses Solana if available
+          username: defaultUsername,
           bio: null,
           avatar_url: null,
           is_creator: false,
@@ -430,9 +456,12 @@ export const Web3Provider = ({ children }) => {
           following_count: 0
         };
 
+
         console.log('📋 New user data to insert:', newUserData);
 
+
         const result = await SupabaseService.createUser(newUserData);
+
 
         if (result.success) {
           console.log('✅ User created in Supabase on first connection');
@@ -450,15 +479,18 @@ export const Web3Provider = ({ children }) => {
           avatar_url: existingUser.avatar_url || '(none)'
         });
 
+
         // If user exists but has no username, update with default
         if (!existingUser.username || existingUser.username.trim() === '') {
           console.log('⚠️ User exists but has no username, updating with default...');
-          const defaultUsername = `User_${walletAddress.substring(0, 8)}`;
+          const defaultUsername = `User_${addressToUse.substring(0, 8)}`;
+
 
           const updateResult = await SupabaseService.createOrUpdateUser({
-            wallet_address: walletAddress.toLowerCase(),
+            wallet_address: addressToUse.toLowerCase(),
             username: defaultUsername
           });
+
 
           if (updateResult.success) {
             console.log('✅ Updated user with default username:', defaultUsername);
@@ -478,32 +510,41 @@ export const Web3Provider = ({ children }) => {
   };
 
 
+
   const registerUser = async (username, bio, avatarFile) => {
     if (!account) {
       return { success: false, message: 'Please connect your wallet first.' };
     }
 
+
     if (!username || username.trim() === '') {
       return { success: false, message: 'Username is required.' };
     }
 
+
     try {
       setLoading(true);
+
 
       let avatarHash = 'QmDefaultAvatar';
       if (avatarFile) {
         avatarHash = await uploadMedia(avatarFile);
       }
 
+      // ✅ FIX: Use Solana wallet if available
+      const solanaAddress = getSolanaWalletAddress();
+      const addressToSave = solanaAddress || account;
+
       // Save user to Supabase ONLY (no blockchain call)
       console.log('📝 Saving user data to Supabase...');
-      console.log('Account address:', account);
+      console.log('Account address:', addressToSave);
       console.log('Username:', username.trim());
       console.log('Bio:', bio || '');
       console.log('Avatar hash:', avatarHash);
 
+
       const userData = {
-        wallet_address: account.toLowerCase(),
+        wallet_address: addressToSave.toLowerCase(), // ✅ FIX: Now uses Solana if available
         username: username.trim(),
         bio: bio || '',
         avatar_url: avatarHash !== 'QmDefaultAvatar' ? avatarHash : null,
@@ -512,9 +553,12 @@ export const Web3Provider = ({ children }) => {
         following_count: 0
       };
 
+
       console.log('📤 Data to insert in Supabase:', userData);
 
+
       const supabaseResult = await SupabaseService.createOrUpdateUser(userData);
+
 
       if (!supabaseResult.success) {
         console.error('❌ Failed to save user to Supabase:', supabaseResult.error);
@@ -522,12 +566,16 @@ export const Web3Provider = ({ children }) => {
         return { success: false, message: 'Failed to register user: ' + supabaseResult.error };
       }
 
+
       console.log('✅ User saved to Supabase successfully');
       console.log('✅ Supabase response:', supabaseResult.data);
 
+
       await loadUserData(account);
 
+
       return { success: true, message: 'Registration successful!' };
+
 
     } catch (error) {
       console.error('Registration error:', error);
@@ -537,13 +585,16 @@ export const Web3Provider = ({ children }) => {
     }
   };
 
+
   const becomeCreator = async () => {
     console.log('🌟 ========== BECOME CREATOR FLOW ==========');
+
 
     if (!account) {
       console.error('❌ No account connected');
       return { success: false, message: 'Please connect your wallet first.' };
     }
+
 
     console.log('📊 Current state:', {
       account,
@@ -553,27 +604,33 @@ export const Web3Provider = ({ children }) => {
       hasContract: !!contract
     });
 
+
     if (!user) {
       console.error('❌ User not loaded');
       return { success: false, message: 'Please register your account first before becoming a creator.' };
     }
+
 
     if (user.isCreator) {
       console.warn('⚠️ User is already a creator');
       return { success: false, message: 'You are already a creator!' };
     }
 
+
     if (!contract) {
       console.error('❌ Contract not initialized');
       return { success: false, message: 'Smart contract not initialized. Please check your network connection.' };
     }
 
+
     try {
       setLoading(true);
+
 
       // Step 0: Check if user is registered on blockchain, if not register them
       console.log('🔍 Step 0: Checking blockchain registration...');
       const userOnBlockchain = await contract.users(account);
+
 
       console.log('📊 Blockchain user data:', {
         exists: userOnBlockchain.exists,
@@ -582,8 +639,10 @@ export const Web3Provider = ({ children }) => {
         address: account
       });
 
+
       if (!userOnBlockchain.exists) {
         console.log('📝 User NOT registered on blockchain, registering now...');
+
 
         // Generate username if missing
         const username = user.username || `User_${account.substring(0, 8)}`;
@@ -593,6 +652,7 @@ export const Web3Provider = ({ children }) => {
           bio: user.bio || ''
         });
 
+
         // Register user on blockchain first
         const registerTx = await contract.registerUser(
           username,
@@ -601,12 +661,14 @@ export const Web3Provider = ({ children }) => {
         );
         console.log('⏳ Registration transaction sent:', registerTx.hash);
 
+
         const registerReceipt = await registerTx.wait();
         console.log('✅ Registration transaction confirmed:', {
           hash: registerReceipt.hash,
           blockNumber: registerReceipt.blockNumber,
           status: registerReceipt.status
         });
+
 
         // Verify registration
         const userAfterReg = await contract.users(account);
@@ -619,11 +681,13 @@ export const Web3Provider = ({ children }) => {
         console.log('✅ User already registered on blockchain');
       }
 
+
       // Step 1: Call blockchain becomeCreator function
       console.log('⛓️ Step 1: Calling becomeCreator on blockchain...');
       const tx = await contract.becomeCreator();
       console.log('⏳ Transaction sent:', tx.hash);
       console.log('⏳ Waiting for confirmation...');
+
 
       // Wait for transaction confirmation
       const receipt = await tx.wait();
@@ -634,6 +698,7 @@ export const Web3Provider = ({ children }) => {
         gasUsed: receipt.gasUsed?.toString()
       });
 
+
       // Verify creator status on blockchain
       const userAfterCreator = await contract.users(account);
       console.log('📊 User after becomeCreator:', {
@@ -642,14 +707,20 @@ export const Web3Provider = ({ children }) => {
         isCreator: userAfterCreator.isCreator
       });
 
+      // ✅ FIX: Use Solana wallet if available
+      const solanaAddress = getSolanaWalletAddress();
+      const addressToUpdate = solanaAddress || account;
+
       // Step 2: Update Supabase after blockchain confirmation
       console.log('📝 Step 2: Updating is_creator in Supabase...');
       const supabaseUpdate = {
-        wallet_address: account.toLowerCase(),
+        wallet_address: addressToUpdate.toLowerCase(), // ✅ FIX: Now uses Solana if available
         is_creator: true
       };
 
+
       const result = await SupabaseService.createOrUpdateUser(supabaseUpdate);
+
 
       if (!result.success) {
         console.error('⚠️ Failed to update is_creator in Supabase:', result.error);
@@ -661,12 +732,15 @@ export const Web3Provider = ({ children }) => {
         console.log('✅ Supabase response:', result.data);
       }
 
+
       // Step 3: Reload user data
       console.log('🔄 Step 3: Reloading user data...');
       await loadUserData(account);
 
+
       console.log('🎉 ========== BECOME CREATOR SUCCESS ==========');
       return { success: true, message: 'Congratulations! You are now a creator!' };
+
 
     } catch (error) {
       console.error('❌ ========== BECOME CREATOR ERROR ==========');
@@ -678,6 +752,7 @@ export const Web3Provider = ({ children }) => {
         reason: error.reason,
         data: error.data
       });
+
 
       // Handle specific error cases
       if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
@@ -694,6 +769,7 @@ export const Web3Provider = ({ children }) => {
         return { success: false, message: 'Username is required. Please complete your profile first.' };
       }
 
+
       console.error('❌ Unknown error:', error.message);
       console.error('❌ ========== ERROR END ==========');
       return { success: false, message: 'Failed to become creator: ' + error.message };
@@ -702,24 +778,30 @@ export const Web3Provider = ({ children }) => {
     }
   };
 
+
   const updateProfile = async (username, bio, avatarFile) => {
     if (!account) {
       return { success: false, message: 'Please connect your wallet first.' };
     }
 
+
     if (!user) {
       return { success: false, message: 'Please register your account first.' };
     }
+
 
     if (!username || username.trim() === '') {
       return { success: false, message: 'Username is required.' };
     }
 
+
     try {
       setLoading(true);
 
+
       let avatarUrl = user.avatarHash || null;
       let avatarBlockchainId = null;
+
 
       // If new avatar file is uploaded
       if (avatarFile) {
@@ -730,12 +812,20 @@ export const Web3Provider = ({ children }) => {
         });
         console.log('📤 Uploading to Storage...');
 
+
         // Step 1: Upload to Supabase Storage 'avatars' bucket
         const timestamp = Date.now();
         const fileExtension = avatarFile.name.split('.').pop();
-        const fileName = `avatar_${account.toLowerCase()}_${timestamp}.${fileExtension}`;
+
+        // ✅ FIX: Use Solana wallet if available
+        const solanaAddress = getSolanaWalletAddress();
+        const addressForFile = solanaAddress || account;
+
+        const fileName = `avatar_${addressForFile.toLowerCase()}_${timestamp}.${fileExtension}`;
+
 
         console.log('📁 Nome file generato:', fileName);
+
 
         const { error: uploadError } = await supabase.storage
           .from('avatars')
@@ -744,18 +834,22 @@ export const Web3Provider = ({ children }) => {
             upsert: false
           });
 
+
         if (uploadError) {
           console.error('❌ Failed to upload avatar:', uploadError);
           throw new Error('Failed to upload avatar: ' + uploadError.message);
         }
+
 
         // Get public URL
         const { data: urlData } = supabase.storage
           .from('avatars')
           .getPublicUrl(fileName);
 
+
         avatarUrl = urlData.publicUrl;
         console.log('✅ Upload completato, URL:', avatarUrl);
+
 
         // Step 2: Register avatar on blockchain as FREE content (price=0, isPaid=false)
         console.log('⛓️ Chiamata contract.createContent...');
@@ -764,6 +858,7 @@ export const Web3Provider = ({ children }) => {
           price: 0,
           isPaid: false
         });
+
 
         try {
           const web3Provider = new ethers.BrowserProvider(window.ethereum);
@@ -774,11 +869,13 @@ export const Web3Provider = ({ children }) => {
             web3Signer
           );
 
+
           console.log('🔐 Opening MetaMask for transaction...');
           // Create content with price=0 and isPaid=false (FREE content)
           const tx = await contractInstance.createContent(avatarUrl, 0, false);
           console.log('✅ Transaction sent! Hash:', tx.hash);
           console.log('⏳ Waiting for blockchain confirmation...');
+
 
           const receipt = await tx.wait();
           console.log('✅ Transazione confermata! Receipt:', {
@@ -787,9 +884,11 @@ export const Web3Provider = ({ children }) => {
             gasUsed: receipt.gasUsed?.toString()
           });
 
+
           // Extract contentId from ContentCreated event
           console.log('🔍 Searching for ContentCreated event in logs...');
           console.log('📊 Total logs:', receipt.logs.length);
+
 
           // Parse logs using contract interface (more robust for ethers.js v6)
           avatarBlockchainId = null;
@@ -799,6 +898,7 @@ export const Web3Provider = ({ children }) => {
                 topics: [...log.topics],
                 data: log.data
               });
+
 
               if (parsedLog && parsedLog.name === 'ContentCreated') {
                 avatarBlockchainId = parsedLog.args[0].toString(); // contentId is first argument
@@ -817,6 +917,7 @@ export const Web3Provider = ({ children }) => {
             }
           }
 
+
           if (!avatarBlockchainId) {
             console.warn('⚠️ ContentCreated event not found in transaction logs');
             console.log('🔍 Available logs:', receipt.logs.map((log, idx) => ({
@@ -825,6 +926,7 @@ export const Web3Provider = ({ children }) => {
               topics: log.topics.map(t => t.substring(0, 10) + '...')
             })));
           }
+
 
         } catch (blockchainError) {
           console.error('❌ Blockchain registration failed:', blockchainError);
@@ -839,26 +941,35 @@ export const Web3Provider = ({ children }) => {
         }
       }
 
+      // ✅ FIX: Use Solana wallet if available
+      const solanaAddress = getSolanaWalletAddress();
+      const addressToUpdate = solanaAddress || account;
+
       // Step 3: Update Supabase with avatar URL and blockchain ID
       console.log('💾 Aggiornamento database...');
       const supabaseUpdate = {
-        wallet_address: account.toLowerCase(),
+        wallet_address: addressToUpdate.toLowerCase(), // ✅ FIX: Now uses Solana if available
         username: username.trim(),
         bio: bio || null,
         avatar_url: avatarUrl,
         avatar_blockchain_id: avatarBlockchainId
       };
 
+
       console.log('📋 Dati da salvare:', supabaseUpdate);
 
+
       const result = await SupabaseService.createOrUpdateUser(supabaseUpdate);
+
 
       if (!result.success) {
         console.error('❌ Failed to update profile in Supabase:', result.error);
         return { success: false, message: 'Failed to update profile: ' + result.error };
       }
 
+
       console.log('✅ Profile updated in Supabase successfully!');
+
 
       // Reload user data
       console.log('🔄 Reloading user data...');
@@ -869,7 +980,9 @@ export const Web3Provider = ({ children }) => {
         blockchainId: avatarBlockchainId
       });
 
+
       return { success: true, message: 'Profile updated successfully!' };
+
 
     } catch (error) {
       console.error('❌ Update profile error:', error);
@@ -879,10 +992,12 @@ export const Web3Provider = ({ children }) => {
     }
   };
 
+
   // Simple media upload to localStorage
   const uploadMedia = async (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+
 
       reader.onload = (event) => {
         try {
@@ -890,6 +1005,7 @@ export const Web3Provider = ({ children }) => {
           const timestamp = Date.now();
           const randomId = Math.random().toString(36).substring(2, 15);
           const fileId = `img_${timestamp}_${randomId}`;
+
 
           const mediaData = {
             id: fileId,
@@ -901,6 +1017,7 @@ export const Web3Provider = ({ children }) => {
             uploadDate: new Date().toISOString()
           };
 
+
           localStorage.setItem(fileId, JSON.stringify(mediaData));
           resolve(fileId);
         } catch (error) {
@@ -908,19 +1025,23 @@ export const Web3Provider = ({ children }) => {
         }
       };
 
+
       reader.onerror = () => {
         reject(new Error('Failed to read file'));
       };
 
+
       reader.readAsDataURL(file);
     });
   };
+
 
   // Retrieve media from localStorage OR return direct URL
   const getMediaUrl = (fileId) => {
     if (!fileId || typeof fileId !== 'string') {
       return null;
     }
+
 
     // TEMPORARY: Allow base64 data URLs (for backward compatibility)
     // TODO: Migrate all base64 to Supabase Storage URLs
@@ -929,16 +1050,19 @@ export const Web3Provider = ({ children }) => {
       return fileId;
     }
 
+
     // If fileId is already a direct URL (e.g., Supabase Storage URL), return it directly
     if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
       console.log('🌐 [getMediaUrl] Direct URL detected:', fileId.substring(0, 50) + '...');
       return fileId;
     }
 
+
     // For demo/placeholder content, return null to show placeholder
     if (fileId.startsWith('QmTest') || fileId === 'default' || fileId === 'QmDefaultAvatar') {
       return null;
     }
+
 
     // Try to retrieve from localStorage (for old base64 stored images)
     try {
@@ -954,9 +1078,11 @@ export const Web3Provider = ({ children }) => {
       console.error('Error retrieving media:', error);
     }
 
+
     console.log('❌ [getMediaUrl] No media found for:', fileId);
     return null;
   };
+
 
   const value = {
     provider,
@@ -971,7 +1097,6 @@ export const Web3Provider = ({ children }) => {
     contractError,
     connectWallet,
     disconnectWallet,
-    switchToBSCTestnet,
     registerUser,
     becomeCreator,
     updateProfile,
@@ -980,11 +1105,13 @@ export const Web3Provider = ({ children }) => {
     getMediaUrl
   };
 
+
   return (
     <Web3Context.Provider value={value}>
       {children}
     </Web3Context.Provider>
   );
 };
+
 
 export default Web3Context;

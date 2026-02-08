@@ -278,7 +278,7 @@ const ShareModal = ({ isOpen, onClose, contentId, contentAuthor, contentDescript
       </div>
 
       {/* Custom CSS for animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes modal-appear {
           from {
             opacity: 0;

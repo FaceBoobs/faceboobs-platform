@@ -1,7 +1,7 @@
 // src/contexts/CommentsContext.js
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useToast } from './ToastContext';
-import { useWeb3 } from './Web3Context';
+import { useSolanaApp } from './SolanaAppContext';
 import { SupabaseService } from '../services/supabaseService';
 
 const CommentsContext = createContext();
@@ -16,7 +16,7 @@ export const useComments = () => {
 
 export const CommentsProvider = ({ children }) => {
   const { toast } = useToast();
-  const { account, user } = useWeb3();
+  const { account, user } = useSolanaApp();
 
   // State to store comments data
   // Structure: { contentId: [{ id, content, user_address, username, created_at }] }
@@ -67,10 +67,10 @@ export const CommentsProvider = ({ children }) => {
 
       const commentData = {
         post_id: parseInt(contentId),
-        user_address: userAddress,
+        user_address: userAddress.toLowerCase(),
         content: commentText.trim(),
         username: username || user?.username || `User${userAddress.substring(0, 6)}`,
-        avatar: user?.profileImage || ''
+        avatar_url: user?.avatar_url || null
       };
 
       const result = await SupabaseService.createComment(commentData);

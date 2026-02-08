@@ -2,7 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader, MessageCircle, Lock, User } from 'lucide-react';
-import { useWeb3 } from '../contexts/Web3Context';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { Transaction, SystemProgram, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { useSolanaApp } from '../contexts/SolanaAppContext';
 import { useLikes } from '../contexts/LikesContext';
 import { useComments } from '../contexts/CommentsContext';
 import { useToast } from '../contexts/ToastContext';
@@ -10,17 +12,20 @@ import { SupabaseService } from '../services/supabaseService';
 import LikeButton from '../components/LikeButton';
 import CommentButton from '../components/CommentButton';
 import ShareButton from '../components/ShareButton';
-import RegisterPostOnBlockchain from '../components/RegisterPostOnBlockchain';
-import { getWalletName, isMobileDevice } from '../utils/walletDetection';
-import { ethers } from 'ethers';
+import { supabase } from '../supabaseClient';
+import { PLATFORM_CONFIG, calculateFees, formatFeeBreakdown } from '../config/platform';
 
 const PostDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { account, user, getMediaUrl, contract } = useWeb3();
+  const { account, user, getMediaUrl } = useSolanaApp();
   const { initializeLikes } = useLikes();
   const { initializeComments, getComments, addComment } = useComments();
   const { toast } = useToast();
+
+  // Solana wallet hooks for split payments
+  const { publicKey, sendTransaction } = useWallet();
+  const { connection } = useConnection();
 
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -66,7 +71,8 @@ const PostDetail = () => {
 
       // Check access if it's a paid post
       if (postData.is_paid && account) {
-        const accessResult = await SupabaseService.checkContentAccess(account, id);
+        const normalizedAccount = account.toLowerCase();
+        const accessResult = await SupabaseService.checkContentAccess(normalizedAccount, id);
         setHasAccess(accessResult.success ? accessResult.hasAccess : false);
       } else {
         setHasAccess(true); // Free posts are always accessible
@@ -82,114 +88,128 @@ const PostDetail = () => {
     }
   };
 
-  const handlePurchase = async () => {
-    // Wallet connection check
-    if (!window.ethereum || !account) {
-      toast.error('Please connect your wallet first.', { id: 'wallet-connect-error' });
-      return;
+// src/pages/PostDetail.js - VERSIONE CORRETTA CON VALIDAZIONI
+// ... (import e useState uguali)
+
+const handlePurchase = async () => {
+  // 🔍 DEBUG + VALIDAZIONE ROBUSTA
+  console.log('🔍 handlePurchase DEBUG:', { 
+    id, postIdType: typeof id, postIdValue: id,
+    post, 
+    postId: post?.id, 
+    postPrice: post?.price 
+  });
+
+  if (!post || !account) {
+    toast.error('Please connect your wallet');
+    return;
+  }
+
+  // VALIDAZIONE post.id
+  const postIdNum = parseInt(post.id);
+  if (isNaN(postIdNum) || postIdNum <= 0) {
+    console.error('❌ Invalid post ID:', post.id);
+    toast.error(`Invalid post ID: ${post.id}`);
+    return;
+  }
+
+  // VALIDAZIONE prezzo
+  const priceSOL = parseFloat(post.price);
+  if (isNaN(priceSOL) || priceSOL <= 0) {
+    toast.error('Invalid post price');
+    return;
+  }
+
+  // Calculate fees
+  const fees = calculateFees(priceSOL);
+
+  const confirmed = window.confirm(
+    `Purchase access to this premium post for ${fees.total} SOL?\n\n` +
+    formatFeeBreakdown(fees.total)
+  );
+  if (!confirmed) return;
+
+  try {
+    setPurchasing(true);
+    toast.info('Processing payment with split (98% creator, 2% platform)...');
+
+    if (!publicKey) {
+      throw new Error('Wallet not connected');
     }
 
-    if (!contract) {
-      toast.error('Smart contract not loaded. Please refresh the page.', { id: 'contract-error' });
-      return;
+const platformPubkey = PLATFORM_CONFIG.WALLET_ADDRESS;
+
+// Creator fallback: usa platform wallet se creator invalido
+let creatorPubkey;
+try {
+  creatorPubkey = new PublicKey(post.creator_address);
+} catch (e) {
+  console.warn('👤 Creator address invalid, using platform wallet:', post.creator_address);
+  creatorPubkey = platformPubkey; // Tutto al platform wallet
+}
+
+
+    // Create transaction con lamports ARROTONDATI
+    const transaction = new Transaction();
+
+    // 1. Creator (98%)
+    const creatorLamports = Math.floor(fees.creatorAmount * LAMPORTS_PER_SOL);
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: publicKey,
+        toPubkey: creatorPubkey,
+        lamports: creatorLamports,
+      })
+    );
+
+    // 2. Platform (2%)
+    const platformLamports = Math.floor(fees.platformFee * LAMPORTS_PER_SOL);
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: publicKey,
+        toPubkey: platformPubkey,
+        lamports: platformLamports,
+      })
+    );
+
+    // Send
+    const signature = await sendTransaction(transaction, connection);
+    toast.info('Confirming transaction...');
+    await connection.confirmTransaction(signature, 'confirmed');
+
+    toast.info('Recording purchase...');
+
+    // SUPABASE con postIdNum
+    const { error: purchaseError } = await supabase.from('postpurchases').insert({
+      post_id: postIdNum,  // ← NUMERO invece di post.id
+      buyer_address: publicKey.toString(),
+      creator_address: post.creator_address,
+      amount_paid: fees.total,
+      platform_fee: fees.platformFee,
+      creator_received: fees.creatorAmount,
+      transaction_signature: signature,
+      blockchain: 'solana'
+    });
+
+    if (purchaseError && purchaseError.code !== '23505') {
+      throw purchaseError;
     }
 
-    if (!post) {
-      toast.error('Post not found.', { id: 'post-error' });
-      return;
+    toast.success('✅ Post unlocked! Payment split completed.');
+    await loadPost(); // Refresh access
+  } catch (e) {
+    console.error('❌ Purchase failed:', e);
+    const msg = e?.message || String(e);
+    if (msg.includes('rejected') || msg.includes('cancel') || msg.includes('user rejected')) {
+      toast.info('Transaction cancelled');
+    } else {
+      toast.error(msg || 'Failed to purchase post');
     }
+  } finally {
+    setPurchasing(false);
+  }
+};
 
-    if (!post.blockchain_content_id) {
-      toast.error('This post is not registered on blockchain. Cannot purchase.', { id: 'blockchain-id-error' });
-      return;
-    }
-
-    try {
-      setPurchasing(true);
-
-      // Check if user is registered on blockchain
-      try {
-        const isRegistered = await contract.isUserRegistered(account);
-        if (!isRegistered) {
-          toast.info('Registering your account on blockchain...', { id: 'register-info' });
-          const regTx = await contract.registerUser();
-          await regTx.wait();
-          toast.success('Account registered successfully!', { id: 'register-success' });
-        }
-      } catch (regError) {
-        console.warn('Registration check failed:', regError);
-        // Continue with purchase attempt
-      }
-
-      const priceInWei = ethers.parseEther(post.price.toString());
-
-      // Detect mobile wallet
-      const walletType = getWalletName();
-      const mobile = isMobileDevice();
-
-      toast.info(`🔐 Opening ${walletType} for transaction...`, {
-        id: 'purchase-open',
-        dismissPrevious: true
-      });
-
-      const tx = await contract.buyContent(post.blockchain_content_id, {
-        value: priceInWei,
-        gasLimit: 300000
-      });
-
-      console.log('⏳ Transaction sent:', tx.hash);
-      toast.info('⏳ Transaction sent! Waiting for confirmation...', {
-        id: 'purchase-pending',
-        dismissPrevious: true
-      });
-
-      const receipt = await tx.wait();
-      console.log('✅ Transaction confirmed:', receipt);
-
-      // Save purchase to database
-      const purchaseData = {
-        user_address: account.toLowerCase(),
-        post_id: parseInt(post.id),
-        amount: post.price.toString(),
-        transaction_hash: receipt.hash,
-        created_at: new Date().toISOString()
-      };
-
-      await SupabaseService.createPurchase(purchaseData);
-
-      toast.success('🎉 Content purchased successfully!', {
-        id: 'purchase-success',
-        dismissPrevious: true
-      });
-
-      setHasAccess(true);
-    } catch (err) {
-      console.error('❌ Purchase error:', err);
-
-      // Clear any pending toasts
-      toast.dismiss('purchase-open');
-      toast.dismiss('purchase-pending');
-
-      // Specific error messages
-      if (err.code === 4001 || err.code === 'ACTION_REJECTED') {
-        toast.error('Transaction cancelled.', { id: 'purchase-cancelled' });
-      } else if (err.code === -32603 || err.message?.includes('insufficient funds')) {
-        toast.error('Insufficient BNB for purchase and gas fees.', { id: 'purchase-insufficient' });
-      } else if (err.message?.includes('not registered')) {
-        toast.error('Account not registered. Please try again.', { id: 'purchase-not-registered' });
-      } else if (err.message?.includes('network')) {
-        toast.error('Network error. Check your connection.', { id: 'purchase-network' });
-      } else if (err.message?.includes('gas')) {
-        toast.error('Gas estimation failed.', { id: 'purchase-gas' });
-      } else if (err.message?.includes('revert')) {
-        toast.error('Transaction reverted. You may already own this content.', { id: 'purchase-revert' });
-      } else {
-        toast.error('Purchase failed. Please try again.', { id: 'purchase-failed' });
-      }
-    } finally {
-      setPurchasing(false);
-    }
-  };
 
   const handleSubmitComment = async (e) => {
     e.preventDefault();
@@ -208,7 +228,7 @@ const PostDetail = () => {
 
       if (result.success) {
         setNewComment('');
-        toast.success('Comment added!');
+        // Toast is already shown by CommentsContext
       }
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -308,16 +328,6 @@ const PostDetail = () => {
             </div>
           </div>
 
-          {/* Show blockchain registration prompt for post owner if needed */}
-          {account && post.creator_address?.toLowerCase() === account.toLowerCase() && (
-            <div className="px-4 pt-4">
-              <RegisterPostOnBlockchain
-                post={post}
-                onSuccess={(updatedPost) => setPost(updatedPost)}
-              />
-            </div>
-          )}
-
           {/* Post Image/Content */}
           <div className="relative">
             {post.is_paid && !hasAccess ? (
@@ -334,7 +344,7 @@ const PostDetail = () => {
                 </p>
                 <div className="flex flex-col items-center space-y-4">
                   <span className="text-3xl font-bold text-purple-600">
-                    {post.price} BNB
+                    {post.price} SOL
                   </span>
                   <button
                     onClick={handlePurchase}
@@ -465,37 +475,46 @@ const PostDetail = () => {
             {/* Comments List */}
             <div className="space-y-4 mb-4 max-h-96 overflow-y-auto">
               {postComments.length > 0 ? (
-                postComments.map((comment) => (
-                  <div key={comment.id} className="flex items-start space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
-                      {comment.avatar ? (
-                        <img
-                          src={getMediaUrl(comment.avatar)}
-                          alt={comment.username}
-                          className="w-full h-full object-cover rounded-full"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <span className="text-white text-xs font-semibold">
-                          {comment.username?.charAt(0).toUpperCase() || 'U'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1 bg-gray-50 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-sm text-gray-900">
-                          {comment.username || 'Anonymous'}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(comment.created_at).toLocaleString()}
+                postComments.map((comment) => {
+                  // Get avatar URL from either the join (users.avatar_url) or direct field
+                  const avatarUrl = comment.users?.avatar_url || comment.avatar_url;
+                  const displayName = comment.users?.username || comment.username || 'Anonymous';
+
+                  return (
+                    <div key={comment.id} className="flex items-start space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
+                        {avatarUrl && getMediaUrl(avatarUrl) ? (
+                          <img
+                            src={getMediaUrl(avatarUrl)}
+                            alt={displayName}
+                            className="w-full h-full object-cover rounded-full"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextElementSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <span
+                          className="text-white text-xs font-semibold"
+                          style={{ display: avatarUrl && getMediaUrl(avatarUrl) ? 'none' : 'flex' }}
+                        >
+                          {displayName.charAt(0).toUpperCase() || 'U'}
                         </span>
                       </div>
-                      <p className="text-gray-700 text-sm">{comment.content}</p>
+                      <div className="flex-1 bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-sm text-gray-900">
+                            {displayName}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(comment.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 text-sm">{comment.content}</p>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-gray-500 text-center py-8">No comments yet. Be the first to comment!</p>
               )}

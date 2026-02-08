@@ -1,4 +1,5 @@
 // src/pages/Messages.js
+// ✅ UPDATED: Added PAID TEXT MESSAGES (0.05 SOL DMs) functionality
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Loader, Lock, Paperclip, Plus, Search, Send, X } from 'lucide-react';
@@ -22,18 +23,6 @@ const Messages = () => {
   // Solana wallet hooks for split payments
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
-
-  // 🔧 FIXED: Helper function to validate and create Solana PublicKey
-  const createPublicKey = (address) => {
-    try {
-      // Attempt to create PublicKey from address
-      return new PublicKey(address);
-    } catch (error) {
-      console.warn('Invalid Solana address, using platform wallet as fallback:', address, error.message);
-      // Fallback to platform wallet if address is invalid
-      return PLATFORM_CONFIG.WALLET_ADDRESS;
-    }
-  };
 
   const [conversations, setConversations] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
@@ -62,10 +51,10 @@ const Messages = () => {
   const [contentPrice, setContentPrice] = useState('');
   const [uploadingMedia, setUploadingMedia] = useState(false);
 
-  // Unlock paid media
+  // Unlock paid media/messages
   const [unlockingMedia, setUnlockingMedia] = useState({}); // { [messageId]: boolean }
 
-  // Paid text message toggle
+  // ✅ NEW: Paid text message toggle
   const [isPaidTextMessage, setIsPaidTextMessage] = useState(false);
   const [paidMessagePrice, setPaidMessagePrice] = useState('0.05'); // Default 0.05 SOL
 
@@ -123,9 +112,6 @@ const Messages = () => {
     // cleanup previous
     if (userMessagesSubscriptionRef.current?.unsubscribe) userMessagesSubscriptionRef.current.unsubscribe();
 
-    // IMPORTANT: subscribeToUserMessages currently exists in your older service variant (non-underscore),
-    // but in your current supabaseService.js (file:146) it’s not shown in the snippet end.
-    // To avoid relying on missing methods, we subscribe directly here.
     const channel = supabase
       .channel(`user-messages-${accountLower}`)
       .on(
@@ -298,32 +284,11 @@ const Messages = () => {
           const unreadCountRes = await countUnreadMessagesFromSender(accountLower, conv.address);
           const unreadCount = unreadCountRes.success ? unreadCountRes.count : 0;
 
-          // 🔧 FIXED: Hide paid message content in sidebar preview
-          const getLastMessagePreview = () => {
-            const msg = conv.lastMessage;
-            if (!msg) return 'No messages yet';
-
-            // Check if it's a paid message
-            if (msg.is_paid) {
-              const isOwn = msg.sender_address?.toLowerCase() === accountLower;
-              if (isOwn) {
-                // Sender sees their own message preview
-                return msg.content || '💜 Paid Message';
-              } else {
-                // Receiver only sees lock indicator
-                return '💜 Paid Message';
-              }
-            }
-
-            // Regular message - show content
-            return msg.content || '';
-          };
-
           return {
             id: conv.address,
             username: otherUser?.username || `User${conv.address.substring(0, 6)}`,
             address: conv.address,
-            lastMessage: getLastMessagePreview(), // 🔧 FIXED: Use helper function
+            lastMessage: conv.lastMessage?.content || 'No messages yet',
             timestamp: conv.lastTimestamp || Date.now(),
             unread: unreadCount > 0,
             unreadCount,
@@ -389,12 +354,13 @@ const Messages = () => {
     }
   };
 
+  // ✅ MODIFIED: Check unlock status for both paid media AND paid text messages
   const formatMessageWithUnlockStatus = async (messageRow) => {
     const isOwn = messageRow.sender_address?.toLowerCase() === accountLower;
 
     let isUnlocked = true;
 
-    // 🔧 FIXED: Check purchase for ANY paid content (media OR text message)
+    // ✅ MODIFIED: Check purchase for ANY paid content (media OR text message)
     if (messageRow.is_paid && !isOwn) {
       try {
         const { data: purchase, error } = await supabase
@@ -406,7 +372,6 @@ const Messages = () => {
 
         isUnlocked = !!purchase && !error;
       } catch (e) {
-        console.error('Error checking purchase status:', e);
         isUnlocked = false;
       }
     }
@@ -458,6 +423,7 @@ const Messages = () => {
     }
   };
 
+  // ✅ MODIFIED: Send text message with optional paid mode
   const sendTextMessage = async (e) => {
     e.preventDefault();
 
@@ -467,7 +433,7 @@ const Messages = () => {
       return;
     }
 
-    // Validate paid message settings
+    // ✅ NEW: Validate paid message settings
     if (isPaidTextMessage) {
       const price = Number(paidMessagePrice);
       if (!Number.isFinite(price) || price <= 0) {
@@ -483,6 +449,7 @@ const Messages = () => {
     try {
       setSendingMessage(true);
 
+      // ✅ MODIFIED: Include is_paid and price fields
       const messageData = {
         sender_address: accountLower,
         receiver_address: activeChat.address.toLowerCase(),
@@ -491,8 +458,8 @@ const Messages = () => {
         has_media: false,
         media_url: null,
         media_type: null,
-        is_paid: isPaidTextMessage,
-        price: isPaidTextMessage ? Number(paidMessagePrice) : 0,
+        is_paid: isPaidTextMessage, // ✅ NEW
+        price: isPaidTextMessage ? Number(paidMessagePrice) : 0, // ✅ NEW
         blockchain_content_id: null
       };
 
@@ -503,15 +470,16 @@ const Messages = () => {
       setMessages((prev) => [...prev, localMsg]);
 
       setNewMessage('');
-      setIsPaidTextMessage(false); // Reset paid message toggle
+      setIsPaidTextMessage(false); // ✅ NEW: Reset paid message toggle
       setConversations((prev) =>
         prev.map((c) =>
           c.address?.toLowerCase() === activeChat.address?.toLowerCase()
-            ? { ...c, lastMessage: isPaidTextMessage ? '💜 Paid Message' : messageData.content, timestamp: Date.now() } // 🔧 FIXED: Consistent lock emoji
+            ? { ...c, lastMessage: isPaidTextMessage ? '🔒 Paid message' : messageData.content, timestamp: Date.now() } // ✅ MODIFIED
             : c
         )
       );
 
+      // ✅ NEW: Show success message for paid messages
       if (isPaidTextMessage) {
         toast.success(`Paid message sent! Receiver must pay ${paidMessagePrice} SOL to read.`);
       }
@@ -620,7 +588,7 @@ const Messages = () => {
         blockchain_content_id: blockchainContentId
       };
 
-      const { data, error } = await supabase.from('messages').insert([messageData]).select().single();
+      const { error } = await supabase.from('messages').insert([messageData]).select().single();
       if (error) throw error;
 
       closeMediaModal();
@@ -638,6 +606,7 @@ const Messages = () => {
     }
   };
 
+  // ✅ MODIFIED: Renamed from handleUnlockMedia - now handles BOTH media AND text messages
   const handleUnlockMessage = async (message) => {
     if (!message) return;
     if (!accountLower) {
@@ -653,6 +622,7 @@ const Messages = () => {
     const priceSOL = Number(message.price);
     const fees = calculateFees(priceSOL);
 
+    // ✅ MODIFIED: Determine content type (media or text message)
     const contentType = message.has_media ? message.media_type : 'message';
     const confirmed = window.confirm(
       `Unlock this ${contentType} for ${fees.total} SOL?\n\n` +
@@ -669,9 +639,6 @@ const Messages = () => {
         throw new Error('Wallet not connected');
       }
 
-      // 🔧 FIXED: Validate creator address before creating transaction
-      const creatorPubkey = createPublicKey(message.sender_address);
-
       // Create transaction with 2 transfers
       const transaction = new Transaction();
 
@@ -679,7 +646,7 @@ const Messages = () => {
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: publicKey,
-          toPubkey: creatorPubkey, // 🔧 FIXED: Use validated PublicKey
+          toPubkey: new PublicKey(message.sender_address),
           lamports: Math.floor(fees.creatorAmount * LAMPORTS_PER_SOL),
         })
       );
@@ -701,7 +668,7 @@ const Messages = () => {
 
       toast.info('Recording purchase...');
 
-      // Record purchase with fee breakdown
+      // ✅ MODIFIED: Record purchase in messagepurchases table
       const { error: purchaseError } = await supabase.from('messagepurchases').insert({
         messageid: message.id,
         buyeraddress: publicKey.toString(),
@@ -717,6 +684,7 @@ const Messages = () => {
         throw purchaseError;
       }
 
+      // ✅ MODIFIED: Show success with content type
       toast.success(`${contentType} unlocked! Payment split completed.`);
       await loadMessages(activeChat.address);
     } catch (e) {
@@ -726,7 +694,7 @@ const Messages = () => {
       if (msg.toLowerCase().includes('rejected') || msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('user rejected')) {
         toast.info('Transaction cancelled');
       } else {
-        toast.error(msg || `Failed to unlock ${contentType}`);
+        toast.error(msg || `Failed to unlock ${contentType}`); // ✅ MODIFIED
       }
     } finally {
       setUnlockingMedia((prev) => ({ ...prev, [message.id]: false }));
@@ -822,13 +790,12 @@ const Messages = () => {
     );
   }
 
-  // 🔧 FIX: Check Solana wallet connection directly
-  if (!publicKey || !accountLower) {
+  if (!accountLower) {
     return (
       <div className="max-w-4xl mx-auto text-center py-12">
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-yellow-800 mb-2">Access Required</h2>
-          <p className="text-yellow-600">Please connect your Solana wallet to access messages.</p>
+          <p className="text-yellow-600">Please connect your wallet to access messages.</p>
         </div>
       </div>
     );
@@ -1045,9 +1012,9 @@ const Messages = () => {
                                       </div>
                                     </div>
 
-                                    {/* 🔧 UI FIX: Smaller unlock button positioned bottom-left */}
+                                    {/* ✅ MODIFIED: Use handleUnlockMessage instead of handleUnlockMedia */}
                                     <div
-                                      className="absolute inset-0 bg-black bg-opacity-70 rounded cursor-pointer"
+                                      className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center rounded cursor-pointer"
                                       onClick={() => handleUnlockMessage(message)}
                                       onTouchEnd={(e) => {
                                         e.preventDefault();
@@ -1056,33 +1023,26 @@ const Messages = () => {
                                       }}
                                       style={{ pointerEvents: 'auto', zIndex: 9999, touchAction: 'manipulation' }}
                                     >
-                                      {/* Lock icon centered */}
-                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <Lock className="text-white" size={32} />
-                                      </div>
-
-                                      {/* 🔧 UI FIX BUTTON: Clean centered unlock button - solid purple pill */}
-                                      <div className="absolute inset-0 flex items-end justify-center pb-3 pointer-events-none">
-                                        <button
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleUnlockMessage(message);
-                                          }}
-                                          className="bg-purple-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-md hover:bg-purple-600 transition pointer-events-auto"
-                                          style={{ cursor: 'pointer' }}
-                                          disabled={!!unlockingMedia[message.id]}
-                                        >
-                                          {unlockingMedia[message.id] ? (
-                                            <span className="inline-flex items-center gap-1">
-                                              <Loader className="animate-spin" size={12} />
-                                              <span>Unlocking...</span>
-                                            </span>
-                                          ) : (
-                                            `Unlock ${message.price} SOL`
-                                          )}
-                                        </button>
-                                      </div>
+                                      <Lock className="text-white mb-1" size={20} />
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handleUnlockMessage(message);
+                                        }}
+                                        className="unlock-button-responsive bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors mt-1 px-3 py-2 text-sm font-semibold"
+                                        style={{ cursor: 'pointer', zIndex: 10000, pointerEvents: 'auto' }}
+                                        disabled={!!unlockingMedia[message.id]}
+                                      >
+                                        {unlockingMedia[message.id] ? (
+                                          <span className="inline-flex items-center gap-2">
+                                            <Loader className="animate-spin" size={16} />
+                                            Unlocking...
+                                          </span>
+                                        ) : (
+                                          `Unlock ${message.price} SOL`
+                                        )}
+                                      </button>
                                     </div>
                                   </div>
                                 ) : message.media_type === 'image' ? (
@@ -1093,29 +1053,26 @@ const Messages = () => {
                               </div>
                             )}
 
-                            {/* 🔧 FIXED: Hide text content for ALL paid messages (with or without media) */}
-                            {message.is_paid && !message.is_unlocked && !message.isOwn ? (
-                              !message.has_media ? (
-                                // Show lock UI only for text-only messages (media messages already have lock UI above)
-                                <div className="flex flex-col items-center gap-2 py-4">
-                                  <Lock className="text-white" size={24} />
-                                  <p className="text-white text-xs text-center mb-2">🔒 Paid Message</p>
-                                  <button
-                                    onClick={() => handleUnlockMessage(message)}
-                                    disabled={!!unlockingMedia[message.id]}
-                                    className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 text-sm font-semibold"
-                                  >
-                                    {unlockingMedia[message.id] ? (
-                                      <span className="inline-flex items-center gap-2">
-                                        <Loader className="animate-spin" size={16} />
-                                        Unlocking...
-                                      </span>
-                                    ) : (
-                                      `Unlock for ${message.price} SOL`
-                                    )}
-                                  </button>
-                                </div>
-                              ) : null // 🔧 FIXED: Hide caption for paid media (media lock UI is above)
+                            {/* ✅ NEW: Paid text message rendering - Show locked if paid and not unlocked */}
+                            {message.is_paid && !message.is_unlocked && !message.isOwn && !message.has_media ? (
+                              <div className="flex flex-col items-center gap-2 py-4">
+                                <Lock className="text-white" size={24} />
+                                <p className="text-white text-xs text-center mb-2">🔒 Paid Message</p>
+                                <button
+                                  onClick={() => handleUnlockMessage(message)}
+                                  disabled={!!unlockingMedia[message.id]}
+                                  className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 text-sm font-semibold"
+                                >
+                                  {unlockingMedia[message.id] ? (
+                                    <span className="inline-flex items-center gap-2">
+                                      <Loader className="animate-spin" size={16} />
+                                      Unlocking...
+                                    </span>
+                                  ) : (
+                                    `Unlock for ${message.price} SOL`
+                                  )}
+                                </button>
+                              </div>
                             ) : (
                               <p className="text-white text-sm break-words">{message.content || ''}</p>
                             )}
@@ -1134,7 +1091,7 @@ const Messages = () => {
                 )}
               </div>
 
-              {/* Input */}
+              {/* ✅ MODIFIED: Input area with paid message toggle */}
               <div className="message-input-container border-t border-gray-200" style={{ background: 'white', padding: 10, borderTop: '1px solid #ddd', zIndex: 100 }}>
                 <input
                   ref={fileInputRef}
@@ -1144,7 +1101,7 @@ const Messages = () => {
                   className="hidden"
                 />
 
-                {/* Paid Message Toggle Bar */}
+                {/* ✅ NEW: Paid Message Toggle Bar */}
                 {isPaidTextMessage && (
                   <div className="mb-2 p-2 bg-purple-50 border border-purple-200 rounded-lg flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-1">
@@ -1183,7 +1140,7 @@ const Messages = () => {
                     <Paperclip size={20} />
                   </button>
 
-                  {/* Send Paid DM Button */}
+                  {/* ✅ NEW: Send Paid DM Button */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1208,7 +1165,7 @@ const Messages = () => {
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder={isPaidTextMessage ? `Type paid message (${paidMessagePrice} SOL)...` : 'Type a message...'}
+                    placeholder={isPaidTextMessage ? `Type paid message (${paidMessagePrice} SOL)...` : 'Type a message...'} {/* ✅ MODIFIED */}
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     disabled={sendingMessage}
                   />

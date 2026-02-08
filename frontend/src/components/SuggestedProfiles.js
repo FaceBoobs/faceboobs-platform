@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useWeb3 } from '../contexts/Web3Context';
+import { useSolanaApp } from '../contexts/SolanaAppContext';
 import { useToast } from '../contexts/ToastContext';
 import { SupabaseService } from '../services/supabaseService';
 import { followUser, unfollowUser, getFollowing } from '../services/followService';
 
 const SuggestedProfiles = () => {
-  const { user: currentUser, account, getMediaUrl } = useWeb3();
+  const { user: currentUser, account, getMediaUrl } = useSolanaApp();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [suggestedUsers, setSuggestedUsers] = useState([]);
@@ -96,7 +96,7 @@ const SuggestedProfiles = () => {
     console.log('║  SuggestedProfiles.handleFollow CLICK    ║');
     console.log('╚══════════════════════════════════════════╝');
     console.log('📊 Current state:');
-    console.log('   - currentUser:', currentUser?.username, currentUser?.address);
+    console.log('   - currentUser:', currentUser?.username, currentUser?.wallet_address);
     console.log('   - account:', account);
     console.log('   - userToFollow.username:', userToFollow.username);
     console.log('   - userToFollow.walletAddress:', userToFollow.walletAddress);
@@ -134,12 +134,14 @@ const SuggestedProfiles = () => {
       console.log('📊 isCurrentlyFollowing:', isCurrentlyFollowing);
 
       if (isCurrentlyFollowing) {
-        // Unfollow
+        // Unfollow - normalize addresses to lowercase
         console.log('🔄 Calling unfollowUser...');
-        console.log('   - From:', account);
-        console.log('   - To:', userToFollow.walletAddress);
+        const myAddress = account.toLowerCase();
+        const theirAddress = userToFollow.walletAddress.toLowerCase();
+        console.log('   - From:', myAddress);
+        console.log('   - To:', theirAddress);
 
-        const result = await unfollowUser(account, userToFollow.walletAddress);
+        const result = await unfollowUser(myAddress, theirAddress);
 
         console.log('📬 unfollowUser result:', result);
 
@@ -156,12 +158,14 @@ const SuggestedProfiles = () => {
           toast.error(`Failed to unfollow: ${result.error}`);
         }
       } else {
-        // Follow
+        // Follow - normalize addresses to lowercase
         console.log('🔄 Calling followUser...');
-        console.log('   - From (follower):', account);
-        console.log('   - To (followed):', userToFollow.walletAddress);
+        const myAddress = account.toLowerCase();
+        const theirAddress = userToFollow.walletAddress.toLowerCase();
+        console.log('   - From (follower):', myAddress);
+        console.log('   - To (followed):', theirAddress);
 
-        const result = await followUser(account, userToFollow.walletAddress);
+        const result = await followUser(myAddress, theirAddress);
 
         console.log('📬 followUser result:', result);
 
@@ -199,8 +203,9 @@ const SuggestedProfiles = () => {
     if (!account) return;
 
     try {
-      console.log('🔍 [SuggestedProfiles] Loading following status for:', account);
-      const result = await getFollowing(account);
+      const normalizedAccount = account.toLowerCase();
+      console.log('🔍 [SuggestedProfiles] Loading following status for:', normalizedAccount);
+      const result = await getFollowing(normalizedAccount);
 
       if (result.success && result.data) {
         console.log('✅ [SuggestedProfiles] Following data:', result.data);

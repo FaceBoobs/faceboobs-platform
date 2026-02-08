@@ -128,7 +128,7 @@ const ViewOnlyMode = ({ onConnect, loading }) => {
           }
         />
         <Route
-          path="/create-post"
+          path="/create"
           element={
             <div className="text-center py-8">
               <Wallet className="h-16 w-16 text-gray-400 mx-auto mb-4" />

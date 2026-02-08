@@ -5,6 +5,11 @@
   "dependencies": {
     "@reown/appkit": "^1.8.7",
     "@reown/appkit-adapter-ethers": "^1.8.7",
+    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/wallet-adapter-react-ui": "^0.9.39",
+    "@solana/wallet-adapter-wallets": "^0.19.37",
+    "@solana/web3.js": "^1.98.4",
     "@supabase/supabase-js": "^2.57.4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.8.0",
@@ -22,15 +27,15 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "HTTPS=true HOST=0.0.0.0 react-scripts start",
-    "start:http": "HOST=0.0.0.0 react-scripts start",
-    "start:local": "react-scripts start",
-   "build": "react-scripts build",
-    "build:prod": "GENERATE_SOURCEMAP=false CI=false react-scripts build",
-    "build:gh-pages": "GENERATE_SOURCEMAP=false PUBLIC_URL=/piattaforma react-scripts build",
+    "start": "HTTPS=true HOST=0.0.0.0 craco start",
+    "start:http": "HOST=0.0.0.0 craco start",
+    "start:local": "craco start",
+    "build": "craco build",
+    "build:prod": "GENERATE_SOURCEMAP=false CI=false craco build",
+    "build:gh-pages": "GENERATE_SOURCEMAP=false PUBLIC_URL=/piattaforma craco build",
     "predeploy": "npm run build:gh-pages",
     "deploy": "gh-pages -d build",
-    "test": "react-scripts test",
+    "test": "craco test",
     "eject": "react-scripts eject",
     "serve": "serve -s build"
   },
@@ -53,9 +58,14 @@
     ]
   },
   "devDependencies": {
+    "@craco/craco": "^7.1.0",
     "autoprefixer": "^10.4.21",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
     "gh-pages": "^6.3.0",
     "postcss": "^8.5.6",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
     "tailwindcss": "^3.4.17"
   }
 }

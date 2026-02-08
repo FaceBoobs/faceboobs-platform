@@ -76,6 +76,7 @@ export class SupabaseService {
 
   static async getPostsByCreator(creatorAddress, limit = 50) {
     try {
+      console.log('🔍 [getPostsByCreator] Fetching posts for creator:', creatorAddress);
       const { data, error } = await supabase
         .from('posts')
         .select('*')
@@ -83,10 +84,14 @@ export class SupabaseService {
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ [getPostsByCreator] Error:', error);
+        throw error;
+      }
+      console.log('✅ [getPostsByCreator] Found', data.length, 'posts');
       return { success: true, data };
     } catch (error) {
-      console.error('Error fetching posts by creator:', error);
+      console.error('❌ [getPostsByCreator] Error fetching posts by creator:', error);
       return { success: false, error: error.message };
     }
   }
@@ -196,17 +201,18 @@ export class SupabaseService {
         .from('stories')
         .delete()
         .lt('expires_at', new Date().toISOString());
+// Get list of users the current user follows (SOLANA only)
+const { data: followingData, error: followingError } = await supabase
+  .from('follows')
+  .select('followed_solana_address')
+  .eq('blockchain', 'solana')
+  .eq('follower_solana_address', userAddress.toLowerCase());
 
-      // Get list of users the current user follows
-      const { data: followingData, error: followingError } = await supabase
-        .from('follows')
-        .select('followed_address')
-        .eq('follower_address', userAddress);
+if (followingError) throw followingError;
 
-      if (followingError) throw followingError;
+// Extract addresses of followed users
+const followingAddresses = followingData?.map(f => f.followed_solana_address) || [];
 
-      // Extract addresses of followed users
-      const followingAddresses = followingData?.map(f => f.followed_address) || [];
 
       // If not following anyone, return empty array
       if (followingAddresses.length === 0) {
@@ -326,11 +332,24 @@ export class SupabaseService {
   // Comments
   static async createComment(commentData) {
     try {
+      // Remove avatar_url from commentData since it doesn't exist in comments table
+      const { avatar_url, ...insertData } = commentData;
+
+      console.log('💬 Creating comment:', insertData);
+
+      // Insert comment and join with users to get avatar_url
       const { data, error } = await supabase
         .from('comments')
-        .insert([commentData])
+        .insert([insertData])
+        .select('*, users!comments_user_address_fkey(username, avatar_url, wallet_address)')
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error inserting comment:', error);
+        throw error;
+      }
+
+      console.log('✅ Comment created:', data);
 
       // Create notification for post owner
       const { data: post } = await supabase
@@ -348,13 +367,13 @@ export class SupabaseService {
           post_id: commentData.post_id,
           from_user_address: commentData.user_address,
           from_username: commentData.username,
-          from_avatar_url: commentData.avatar || null
+          from_avatar_url: avatar_url || null
         });
       }
 
       return { success: true, data };
     } catch (error) {
-      console.error('Error creating comment:', error);
+      console.error('❌ Error creating comment:', error);
       return { success: false, error: error.message };
     }
   }
@@ -590,41 +609,41 @@ export class SupabaseService {
     }
   }
 
-  static async getUser(address) {
-    try {
-      console.log('🔍 [SupabaseService.getUser] Querying for address:', address);
-      console.log('   - Normalized (lowercase):', address?.toLowerCase());
+static async getUser(address) {
+  try {
+    console.log('🔍 [SupabaseService.getUser] Querying for address:', address);
+    const normalized = address?.toLowerCase();
+    console.log('   - Normalized (lowercase):', normalized);
 
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('wallet_address', address?.toLowerCase()) // SEMPRE usa toLowerCase
-        .single();
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('wallet_address', normalized) // SEMPRE usa toLowerCase
+      .maybeSingle(); // ✅ evita 406 quando l’utente non esiste
 
-      console.log('📬 [SupabaseService.getUser] Query result:', {
-        found: !!data,
-        error: error?.code,
-        errorMessage: error?.message
-      });
+    console.log('📬 [SupabaseService.getUser] Query result:', {
+      found: !!data,
+      error: error?.code,
+      errorMessage: error?.message
+    });
 
-      // PGRST116 = "not found" - non è un errore critico
-      if (error && error.code !== 'PGRST116') {
-        console.error('❌ [SupabaseService.getUser] Critical error:', error);
-        throw error;
-      }
-
-      if (data) {
-        console.log('✅ [SupabaseService.getUser] User found:', data.username);
-      } else {
-        console.log('⚠️ [SupabaseService.getUser] User not found');
-      }
-
-      return { success: true, data };
-    } catch (error) {
-      console.error('❌ [SupabaseService.getUser] Error fetching user:', error);
-      return { success: false, error: error.message };
+    if (error) {
+      console.error('❌ [SupabaseService.getUser] Error:', error);
+      throw error;
     }
+
+    if (data) {
+      console.log('✅ [SupabaseService.getUser] User found:', data.username);
+    } else {
+      console.log('⚠️ [SupabaseService.getUser] User not found');
+    }
+
+    return { success: true, data }; // data può essere null
+  } catch (error) {
+    console.error('❌ [SupabaseService.getUser] Error fetching user:', error);
+    return { success: false, error: error.message };
   }
+}
 
   static async getAllUsers(limit = 50) {
     try {
@@ -642,143 +661,100 @@ export class SupabaseService {
     }
   }
 
-  // Follows
+  // Follows (snake_case: follower_address, followed_address)
   static async followUser(followerAddress, followedAddress) {
-    console.log('');
-    console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
-    console.log('🔵 SupabaseService.followUser CHIAMATA');
-    console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
-
     try {
-      console.log('📊 Parametri:');
-      console.log('   - followerAddress:', followerAddress);
-      console.log('   - followedAddress:', followedAddress);
-      console.log('   - followerLowercase:', followerAddress.toLowerCase());
-      console.log('   - followedLowercase:', followedAddress.toLowerCase());
+      const followerLower = followerAddress?.toLowerCase();
+      const followedLower = followedAddress?.toLowerCase();
+
+      if (!followerLower || !followedLower) {
+        throw new Error('Invalid follower/followed address');
+      }
 
       // Check if already following
-      console.log('🔍 STEP 1: Controllo se già seguito...');
       const { data: existingFollow, error: checkError } = await supabase
         .from('follows')
         .select('id')
-        .eq('follower_address', followerAddress.toLowerCase())
-        .eq('followed_address', followedAddress.toLowerCase())
-        .single();
+        .eq('follower_address', followerLower)
+        .eq('followed_address', followedLower)
+        .maybeSingle();
 
-      console.log('📬 Risultato controllo esistente:');
-      console.log('   - data:', existingFollow);
-      console.log('   - error:', checkError);
-      console.log('   - errorCode:', checkError?.code);
-
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error('❌ ERRORE nel controllo follow esistente:', checkError);
-        throw checkError;
-      }
+      if (checkError) throw checkError;
 
       if (existingFollow) {
-        console.log('⚠️ Already following this user');
-        console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
         return { success: true, action: 'already_following' };
       }
 
-      console.log('✅ Non ancora seguito, procedo con INSERT');
-
       // Insert follow relationship
-      console.log('🔍 STEP 2: INSERT nella tabella follows...');
-      console.log('📝 Dati da inserire:', {
-        follower_address: followerAddress.toLowerCase(),
-        followed_address: followedAddress.toLowerCase()
-      });
-
       const { data: insertData, error: insertError } = await supabase
         .from('follows')
         .insert([{
-          follower_address: followerAddress.toLowerCase(),
-          followed_address: followedAddress.toLowerCase()
+          follower_address: followerLower,
+          followed_address: followedLower
         }])
-        .select(); // Aggiungo .select() per vedere i dati inseriti
+        .select();
 
-      console.log('📬 Risultato INSERT:');
-      console.log('   - data:', insertData);
-      console.log('   - error:', insertError);
+      if (insertError) throw insertError;
 
-      if (insertError) {
-        console.error('❌ ERRORE INSERT:', insertError);
-        console.error('   - Message:', insertError.message);
-        console.error('   - Code:', insertError.code);
-        console.error('   - Details:', insertError.details);
-        console.error('   - Hint:', insertError.hint);
-        throw insertError;
-      }
-
-      console.log('✅ INSERT riuscito!');
-
-      // Update follow counts using the new centralized function
-      console.log('🔍 STEP 3: Aggiorno contatori follow...');
-      const countsResult = await this.updateFollowCounts(followerAddress, followedAddress);
-
+      // Update follow counts (users table)
+      const countsResult = await this.updateFollowCounts(followerLower, followedLower);
       if (!countsResult.success) {
-        console.warn('⚠️ Failed to update counts, but follow was successful');
+        console.warn('⚠️ Failed to update counts, but follow was successful:', countsResult.error);
       }
 
-      console.log('✅ Successfully followed user');
-      console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
       return { success: true, action: 'followed', data: insertData };
     } catch (error) {
-      console.error('❌ ERRORE CATCH in SupabaseService.followUser:');
-      console.error('   - Message:', error.message);
-      console.error('   - Code:', error.code);
-      console.error('   - Details:', error.details);
-      console.error('   - Hint:', error.hint);
-      console.error('   - Stack:', error.stack);
-      console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+      console.error('❌ Error in followUser:', error);
       return { success: false, error: error.message };
     }
   }
 
   static async unfollowUser(followerAddress, followedAddress) {
     try {
-      console.log('🔄 Unfollowing user:', followerAddress, '-x->', followedAddress);
+      const followerLower = followerAddress?.toLowerCase();
+      const followedLower = followedAddress?.toLowerCase();
 
-      // Delete follow relationship
+      if (!followerLower || !followedLower) {
+        throw new Error('Invalid follower/followed address');
+      }
+
       const { error: deleteError } = await supabase
         .from('follows')
         .delete()
-        .eq('follower_address', followerAddress.toLowerCase())
-        .eq('followed_address', followedAddress.toLowerCase());
+        .eq('follower_address', followerLower)
+        .eq('followed_address', followedLower);
 
       if (deleteError) throw deleteError;
 
-      console.log('✅ DELETE successful');
-
-      // Update follow counts using the new centralized function
-      console.log('🔍 Updating follow counts...');
-      const countsResult = await this.updateFollowCounts(followerAddress, followedAddress);
-
+      const countsResult = await this.updateFollowCounts(followerLower, followedLower);
       if (!countsResult.success) {
-        console.warn('⚠️ Failed to update counts, but unfollow was successful');
+        console.warn('⚠️ Failed to update counts, but unfollow was successful:', countsResult.error);
       }
 
-      console.log('✅ Successfully unfollowed user');
       return { success: true, action: 'unfollowed' };
     } catch (error) {
-      console.error('❌ Error unfollowing user:', error);
+      console.error('❌ Error in unfollowUser:', error);
       return { success: false, error: error.message };
     }
   }
 
   static async isFollowing(followerAddress, followedAddress) {
     try {
+      const followerLower = followerAddress?.toLowerCase();
+      const followedLower = followedAddress?.toLowerCase();
+
+      if (!followerLower || !followedLower) {
+        throw new Error('Invalid follower/followed address');
+      }
+
       const { data, error } = await supabase
         .from('follows')
         .select('id')
-        .eq('follower_address', followerAddress)
-        .eq('followed_address', followedAddress)
-        .single();
+        .eq('follower_address', followerLower)
+        .eq('followed_address', followedLower)
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
+      if (error) throw error;
 
       return { success: true, isFollowing: !!data };
     } catch (error) {
@@ -789,13 +765,17 @@ export class SupabaseService {
 
   static async getFollowers(userAddress) {
     try {
+      const addr = userAddress?.toLowerCase();
+      if (!addr) throw new Error('Invalid userAddress');
+
       const { data, error } = await supabase
         .from('follows')
         .select('follower_address')
-        .eq('followed_address', userAddress);
+        .eq('followed_address', addr);
 
       if (error) throw error;
-      return { success: true, data: data.map(f => f.follower_address) };
+
+      return { success: true, data: (data || []).map(f => f.follower_address) };
     } catch (error) {
       console.error('❌ Error fetching followers:', error);
       return { success: false, error: error.message };
@@ -804,13 +784,17 @@ export class SupabaseService {
 
   static async getFollowing(userAddress) {
     try {
+      const addr = userAddress?.toLowerCase();
+      if (!addr) throw new Error('Invalid userAddress');
+
       const { data, error } = await supabase
         .from('follows')
         .select('followed_address')
-        .eq('follower_address', userAddress);
+        .eq('follower_address', addr);
 
       if (error) throw error;
-      return { success: true, data: data.map(f => f.followed_address) };
+
+      return { success: true, data: (data || []).map(f => f.followed_address) };
     } catch (error) {
       console.error('❌ Error fetching following:', error);
       return { success: false, error: error.message };
@@ -820,88 +804,44 @@ export class SupabaseService {
   // Update follow counts for users after follow/unfollow
   static async updateFollowCounts(followerAddress, followedAddress) {
     try {
-      console.log('🔄 [SupabaseService] Updating follow counts...');
-      console.log('   - Follower:', followerAddress);
-      console.log('   - Followed:', followedAddress);
+      const followerLower = followerAddress?.toLowerCase();
+      const followedLower = followedAddress?.toLowerCase();
+
+      if (!followerLower || !followedLower) {
+        throw new Error('Invalid follower/followed address');
+      }
 
       // Count followers of the followed user
       const { count: followersCount, error: followersError } = await supabase
         .from('follows')
         .select('*', { count: 'exact', head: true })
-        .eq('followed_address', followedAddress.toLowerCase());
+        .eq('followed_address', followedLower);
 
-      if (followersError) {
-        console.error('❌ Error counting followers:', followersError);
-        throw followersError;
-      }
+      if (followersError) throw followersError;
 
       // Count following of the follower user
       const { count: followingCount, error: followingError } = await supabase
         .from('follows')
         .select('*', { count: 'exact', head: true })
-        .eq('follower_address', followerAddress.toLowerCase());
+        .eq('follower_address', followerLower);
 
-      if (followingError) {
-        console.error('❌ Error counting following:', followingError);
-        throw followingError;
-      }
+      if (followingError) throw followingError;
 
-      console.log('📊 [SupabaseService] Counts calculated:', {
-        followersCount: followersCount || 0,
-        followingCount: followingCount || 0
-      });
-
-      // Update followers_count for followed user
-      console.log('🔍 [SupabaseService] UPDATE 1: Updating followers_count for:', followedAddress.toLowerCase());
-      console.log('   - Setting followers_count to:', followersCount || 0);
-
-      const { data: followedUpdateData, error: updateFollowedError, count: followedUpdateCount } = await supabase
+      // Update users table (your project uses wallet_address + followers_count/following_count)
+      const { error: updateFollowedError } = await supabase
         .from('users')
         .update({ followers_count: followersCount || 0 })
-        .eq('wallet_address', followedAddress.toLowerCase())
-        .select(); // Add select() to see what was updated
+        .eq('wallet_address', followedLower);
 
-      console.log('📬 [SupabaseService] UPDATE 1 Result:');
-      console.log('   - Updated rows:', followedUpdateData?.length || 0);
-      console.log('   - Data:', followedUpdateData);
-      console.log('   - Error:', updateFollowedError);
+      if (updateFollowedError) throw updateFollowedError;
 
-      if (updateFollowedError) {
-        console.error('❌ Error updating followed user count:', updateFollowedError);
-        throw updateFollowedError;
-      }
-
-      if (!followedUpdateData || followedUpdateData.length === 0) {
-        console.warn('⚠️ [SupabaseService] UPDATE 1: No rows updated for followed user!');
-        console.warn('   - This means the user', followedAddress.toLowerCase(), 'does NOT exist in users table');
-      }
-
-      // Update following_count for follower user
-      console.log('🔍 [SupabaseService] UPDATE 2: Updating following_count for:', followerAddress.toLowerCase());
-      console.log('   - Setting following_count to:', followingCount || 0);
-
-      const { data: followerUpdateData, error: updateFollowerError } = await supabase
+      const { error: updateFollowerError } = await supabase
         .from('users')
         .update({ following_count: followingCount || 0 })
-        .eq('wallet_address', followerAddress.toLowerCase())
-        .select(); // Add select() to see what was updated
+        .eq('wallet_address', followerLower);
 
-      console.log('📬 [SupabaseService] UPDATE 2 Result:');
-      console.log('   - Updated rows:', followerUpdateData?.length || 0);
-      console.log('   - Data:', followerUpdateData);
-      console.log('   - Error:', updateFollowerError);
+      if (updateFollowerError) throw updateFollowerError;
 
-      if (updateFollowerError) {
-        console.error('❌ Error updating follower user count:', updateFollowerError);
-        throw updateFollowerError;
-      }
-
-      if (!followerUpdateData || followerUpdateData.length === 0) {
-        console.warn('⚠️ [SupabaseService] UPDATE 2: No rows updated for follower user!');
-        console.warn('   - This means the user', followerAddress.toLowerCase(), 'does NOT exist in users table');
-      }
-
-      console.log('✅ [SupabaseService] Follow counts updated successfully');
       return {
         success: true,
         counts: {
@@ -910,10 +850,11 @@ export class SupabaseService {
         }
       };
     } catch (error) {
-      console.error('❌ [SupabaseService] Error updating follow counts:', error);
+      console.error('❌ Error updating follow counts:', error);
       return { success: false, error: error.message };
     }
   }
+
 
   // Purchases
   static async createPurchase(purchaseData) {
