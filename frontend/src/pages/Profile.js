@@ -462,6 +462,21 @@ const Profile = () => {
 
                 return (
                   <div key={content.id} id={`post-${content.id}`} className="relative group transition-all">
+                    {isOwnProfile && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeletePost(content.id);
+                        }}
+                        className="absolute top-2 left-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-lg z-50"
+                        title="Delete post"
+                        style={{ pointerEvents: 'auto' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+
                     <div
                       className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer relative"
                       onClick={() => navigate(`/post/${content.id}`)}
@@ -507,19 +522,6 @@ const Profile = () => {
                         </div>
                       )}
                     </div>
-
-                    {isOwnProfile && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeletePost(content.id);
-                        }}
-                        className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-20"
-                        title="Delete post"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
                   </div>
                 );
               })}

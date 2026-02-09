@@ -141,34 +141,31 @@ const Home = () => {
       console.log('🔄 [Home] Calling getFollowing from followService...');
       const followingResult = await getFollowing(account);
 
-      if (!followingResult.success || !followingResult.data) {
-        console.error('❌ [Home] Failed to load following list:', followingResult.error);
-        setFollowingAddresses([]);
-        setHasFollows(false);
-        setContents([]);
-        setLoading(false);
-        return;
+      let followingAddresses = [];
+
+      if (followingResult.success && followingResult.data) {
+        followingAddresses = followingResult.data;
+        console.log('✅ [Home] Following addresses loaded:', followingAddresses.length, 'addresses');
+        console.log('📋 [Home] Following addresses:', followingAddresses);
+      } else {
+        console.log('⚠️ [Home] No following list or error:', followingResult.error);
       }
 
-      const addresses = followingResult.data;
-      console.log('✅ [Home] Following addresses loaded:', addresses.length, 'addresses');
-      console.log('📋 [Home] Following addresses:', addresses);
+      setFollowingAddresses(followingAddresses);
+      setHasFollows(followingAddresses.length > 0);
 
-      setFollowingAddresses(addresses);
-      setHasFollows(addresses.length > 0);
+      // 2. Load posts from followed users + own posts
+      // ALWAYS include current user's address to show their own posts in feed
+      const addressesToFetch = [...followingAddresses, account.toLowerCase()];
+      const uniqueAddresses = [...new Set(addressesToFetch)]; // Remove duplicates
 
-      // If user doesn't follow anyone, show empty feed
-      if (addresses.length === 0) {
-        console.log('📭 User is not following anyone');
-        setContents([]);
-        setLoading(false);
-        return;
-      }
+      console.log('🔵 [Home] Loading posts from followed creators + own posts...');
+      console.log('📋 [Home] Fetching from addresses:', uniqueAddresses.length);
+      console.log('👤 [Home] Your address:', account.toLowerCase());
+      console.log('👥 [Home] Following:', followingAddresses.length, 'users');
 
-      // 2. Load posts from followed users IMMEDIATELY
-      console.log('🔵 [Home] Loading posts from followed creators...');
-
-      const result = await SupabaseService.getPostsByCreators(addresses);
+      // Fetch posts ONLY from these addresses (followed + self)
+      const result = await SupabaseService.getPostsByCreators(uniqueAddresses);
 
       if (!result.success) {
         console.error('❌ Error loading posts:', result.error);
@@ -178,7 +175,7 @@ const Home = () => {
         return;
       }
 
-      console.log(`✅ Loaded ${result.data.length} posts from followed creators`);
+      console.log(`✅ Loaded ${result.data.length} posts (from followed users + your own posts)`);
 
       // Convert Supabase posts to expected format
       const contentData = result.data.map(post => ({
@@ -913,7 +910,7 @@ const Home = () => {
             <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl text-white p-8 mb-6 text-center">
               <div className="text-6xl mb-4">👥</div>
               <h2 className="text-2xl font-bold mb-2">Your Feed is Empty</h2>
-              <p className="opacity-90 mb-4">Start following creators to see their posts in your feed!</p>
+              <p className="opacity-90 mb-4">You haven't created any posts yet. Start following creators or share your first post!</p>
               <div className="flex justify-center space-x-4">
                 <button
                   onClick={() => navigate('/explore')}
@@ -929,7 +926,7 @@ const Home = () => {
             <div className="bg-gray-50 rounded-xl p-8 mb-6 text-center border border-gray-200">
               <div className="text-6xl mb-4">📭</div>
               <h2 className="text-2xl font-bold mb-2 text-gray-800">No Posts Yet</h2>
-              <p className="text-gray-600 mb-4">The creators you follow haven't posted anything yet. Check back later!</p>
+              <p className="text-gray-600 mb-4">You and the creators you follow haven't posted anything yet. Be the first to share!</p>
               <div className="flex justify-center space-x-4">
                 <button
                   onClick={() => navigate('/search')}
