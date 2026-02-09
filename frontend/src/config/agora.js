@@ -1,0 +1,5 @@
+export const AGORA_CONFIG = {
+  APP_ID: '78f9f0fc63964741b06114f18215c94b',
+  APP_CERTIFICATE: 'fb3d138529424247a17ef63caffed271',
+  ENABLED: true
+};

@@ -6,6 +6,7 @@ import { useSolanaApp } from '../contexts/SolanaAppContext';
 import { useToast } from '../contexts/ToastContext';
 import EditProfileModal from '../components/EditProfileModal';
 import PostDetailModal from '../components/PostDetailModal';
+import VideoCallButton from '../components/VideoCall/VideoCallButton';
 import { SupabaseService } from '../services/supabaseService';
 import { supabase } from '../supabaseClient';
 
@@ -410,7 +411,7 @@ const Profile = () => {
             <div className="text-sm text-gray-500 mt-2">{formatAddress(profileData.address)}</div>
           </div>
 
-          <div className="flex space-x-3">
+          <div className="flex flex-wrap gap-3">
             {isOwnProfile ? (
               <button
                 onClick={() => setShowEditModal(true)}
@@ -421,15 +422,18 @@ const Profile = () => {
                 <span>Edit Profile</span>
               </button>
             ) : (
-              <button
-                onClick={handleFollow}
-                className={`px-6 py-2 rounded-lg font-semibold transition-colors flex items-center space-x-2 ${
-                  isFollowing ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-blue-500 text-white hover:bg-blue-600'
-                }`}
-              >
-                {isFollowing ? <UserMinus size={16} /> : <UserPlus size={16} />}
-                <span>{isFollowing ? 'Unfollow' : 'Follow'}</span>
-              </button>
+              <>
+                <button
+                  onClick={handleFollow}
+                  className={`px-6 py-2 rounded-lg font-semibold transition-colors flex items-center space-x-2 ${
+                    isFollowing ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  {isFollowing ? <UserMinus size={16} /> : <UserPlus size={16} />}
+                  <span>{isFollowing ? 'Unfollow' : 'Follow'}</span>
+                </button>
+                <VideoCallButton creatorAddress={profileData.address} />
+              </>
             )}
           </div>
         </div>

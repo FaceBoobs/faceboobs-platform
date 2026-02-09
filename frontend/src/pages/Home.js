@@ -214,7 +214,7 @@ const Home = () => {
           console.log('🔗 [Home] Blockchain following:', blockchainFollowing.length, 'addresses');
 
           // You can compare and sync here if needed
-          if (blockchainFollowing.length !== addresses.length) {
+          if (blockchainFollowing.length !== uniqueAddresses.length) {
             console.warn('⚠️ [Home] Blockchain and database following lists differ!');
           }
         } catch (blockchainError) {

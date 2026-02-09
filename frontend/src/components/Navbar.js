@@ -11,7 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  Bell
+  Bell,
+  Video
 } from 'lucide-react';
 import { SupabaseService } from '../services/supabaseService';
 import { useNotifications } from '../contexts/NotificationsContext';
@@ -85,7 +86,8 @@ const Navbar = ({ user, account, onDisconnect, onBecomeCreator, loading }) => {
   if (user?.is_creator) {
     navItems.push(
       { icon: PlusSquare, label: 'Create', path: '/create' },
-      { icon: DollarSign, label: 'Earnings', path: '/earnings' }
+      { icon: DollarSign, label: 'Earnings', path: '/earnings' },
+      { icon: Video, label: 'Video Calls', path: '/settings/videocall' }
     );
   }
 

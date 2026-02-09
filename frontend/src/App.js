@@ -1,6 +1,7 @@
 // src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 import { SolanaWalletProvider } from './contexts/SolanaWalletContext';
 import { SolanaAppProvider, useSolanaApp } from './contexts/SolanaAppContext';
@@ -24,10 +25,13 @@ import Messages from './pages/Messages';
 import Search from './pages/Search';
 import Notifications from './pages/Notifications';
 import UploadTest from './pages/UploadTest';
+import VideoCallRoom from './pages/VideoCallRoom';
+import VideoCallSettings from './pages/VideoCallSettings';
 
 import LoginModal from './components/LoginModal';
 import { CreatorSuccessModal } from './components/SuccessModal';
 import ToastContainer from './components/Toast';
+import IncomingCallAlert from './components/VideoCall/IncomingCallAlert';
 
 import { supabase } from './supabaseClient';
 import './App.css';
@@ -272,6 +276,8 @@ function AppContent() {
 
   return (
     <ErrorBoundary>
+      <Toaster position="top-right" />
+      <IncomingCallAlert />
       <Router>
         <div className="min-h-screen bg-gray-50">
           <SupabaseConnectionBanner />
@@ -319,6 +325,8 @@ function AppContent() {
                 <Route path="/messages" element={<Messages />} />
                 <Route path="/messages/:conversationId" element={<Messages />} />
                 <Route path="/search" element={<Search />} />
+                <Route path="/videocall/:channelName" element={<VideoCallRoom />} />
+                <Route path="/settings/videocall" element={user?.is_creator ? <VideoCallSettings /> : <Navigate to="/" />} />
 
                 {process.env.NODE_ENV === 'development' && <Route path="/upload-test" element={<UploadTest />} />}
 
