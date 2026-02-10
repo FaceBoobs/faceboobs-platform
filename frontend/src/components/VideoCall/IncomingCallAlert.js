@@ -22,23 +22,44 @@ const IncomingCallAlert = () => {
 
   const fetchPendingRequests = async () => {
     try {
+      const normalizedAddress = publicKey.toString().toLowerCase();
+
+      // Fetch pending requests without join
       const { data, error } = await supabase
         .from('videocall_requests')
-        .select(`
-          *,
-          fan:fan_address (
-            username,
-            avatar_url
-          )
-        `)
-        .eq('creator_address', publicKey.toString())
+        .select('*')
+        .eq('creator_address', normalizedAddress)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPendingRequests(data || []);
+
+      // Manually fetch user data for each request
+      if (data && data.length > 0) {
+        const enrichedRequests = [];
+
+        for (let request of data) {
+          // ✅ FIX: Usa solana_address (corretto da FaceBoobs schema)
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('username, avatar_url')
+            .eq('solana_address', request.fan_address.toLowerCase()) // ← CAMBIO QUI
+            .single();
+
+          // Attach user data to request
+          enrichedRequests.push({
+            ...request,
+            fan: userData || { username: 'Unknown User', avatar_url: null }
+          });
+        }
+
+        setPendingRequests(enrichedRequests);
+      } else {
+        setPendingRequests([]);
+      }
     } catch (error) {
       console.error('Error fetching requests:', error);
+      setPendingRequests([]);
     }
   };
 

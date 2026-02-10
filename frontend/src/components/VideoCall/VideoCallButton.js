@@ -10,20 +10,33 @@ const VideoCallButton = ({ creatorAddress }) => {
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
+    console.log('🔍 VideoCallButton - Creator address:', creatorAddress);
     fetchSettings();
   }, [creatorAddress]);
 
   const fetchSettings = async () => {
     try {
-      const { data } = await supabase
+      console.log('📞 Fetching settings for:', creatorAddress);
+
+      // Normalize address to lowercase for consistent matching
+      const normalizedAddress = creatorAddress?.toLowerCase();
+      console.log('📞 Normalized address:', normalizedAddress);
+
+      const { data, error } = await supabase
         .from('videocall_settings')
         .select('*')
-        .eq('creator_solana_address', creatorAddress)
+        .eq('creator_solana_address', normalizedAddress)
         .single();
+
+      console.log('📦 Settings result:', { data, error });
+
+      if (error) {
+        console.error('❌ Settings error:', error);
+      }
 
       setSettings(data);
     } catch (error) {
-      console.error('Error fetching videocall settings:', error);
+      console.error('❌ Fetch settings error:', error);
     }
   };
 

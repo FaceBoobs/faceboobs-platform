@@ -128,7 +128,23 @@ const Profile = () => {
             followersCount: userFromDB.data.followers_count || 0,
             followingCount: userFromDB.data.following_count || 0,
             totalEarnings: '0'
+            
           };
+                  // 🔧 VIDEO CALL SETTINGS
+        const { data: videoSettings } = await supabase
+          .from('videocall_settings')
+          .select('is_available, price_per_minute')
+          .eq('creator_solana_address', profileAddress)
+          .maybeSingle();
+
+        if (videoSettings) {
+          userData.videoCallSettings = {
+            isAvailable: videoSettings.is_available || false,
+            pricePerMinute: videoSettings.price_per_minute || 0
+          };
+          console.log('📞 Video settings:', userData.videoCallSettings);
+        }
+
         } else if (isOwnProfile && user) {
           // fallback to context user (still supabase-driven)
           userData = {
@@ -432,7 +448,13 @@ const Profile = () => {
                   {isFollowing ? <UserMinus size={16} /> : <UserPlus size={16} />}
                   <span>{isFollowing ? 'Unfollow' : 'Follow'}</span>
                 </button>
-                <VideoCallButton creatorAddress={profileData.address} />
+                {profileData.isCreator && profileData.videoCallSettings?.isAvailable && !isOwnProfile && (
+  <VideoCallButton 
+    creatorAddress={profileData.address} 
+    pricePerMinute={profileData.videoCallSettings.pricePerMinute}
+  />
+)}
+
               </>
             )}
           </div>
