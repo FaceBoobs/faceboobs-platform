@@ -72,7 +72,7 @@ export const runFollowDiagnostic = async (userAddress) => {
     const { data, error } = await supabase
       .from('follows')
       .select('*')
-      .eq('follower_address', userAddress.toLowerCase());
+      .eq('follower_solana_address', userAddress.toLowerCase());
 
     if (error) {
       console.error('❌ Direct query failed:', error);
@@ -91,17 +91,17 @@ export const runFollowDiagnostic = async (userAddress) => {
     const lowerCase = await supabase
       .from('follows')
       .select('*')
-      .eq('follower_address', userAddress.toLowerCase());
+      .eq('follower_solana_address', userAddress.toLowerCase());
 
     const upperCase = await supabase
       .from('follows')
       .select('*')
-      .eq('follower_address', userAddress.toUpperCase());
+      .eq('follower_solana_address', userAddress.toUpperCase());
 
     const original = await supabase
       .from('follows')
       .select('*')
-      .eq('follower_address', userAddress);
+      .eq('follower_solana_address', userAddress);
 
     console.log('📊 Lowercase results:', lowerCase.data?.length || 0);
     console.log('📊 Uppercase results:', upperCase.data?.length || 0);
@@ -161,7 +161,7 @@ export const exportUserFollows = async (userAddress) => {
     const { data, error } = await supabase
       .from('follows')
       .select('*')
-      .eq('follower_address', userAddress.toLowerCase());
+      .eq('follower_solana_address', userAddress.toLowerCase());
 
     if (error) throw error;
 
