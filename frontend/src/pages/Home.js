@@ -48,17 +48,17 @@ const Home = () => {
   }, [connected, publicKey, web3Loading, navigate, toast]);
 
   useEffect(() => {
-    if (account) {
+    if (connected && publicKey) {
       loadFollowingAndFeed();
       loadStoriesData();
     }
-  }, [account]);
+  }, [connected, publicKey]);
 
   // Listen for refresh events from post creation
   useEffect(() => {
     const handleRefreshFeed = () => {
       console.log('Refresh feed requested');
-      if (account) {
+      if (connected && publicKey) {
         loadFollowingAndFeed();
         loadStoriesData();
       }
@@ -66,7 +66,7 @@ const Home = () => {
 
     window.addEventListener('refreshFeed', handleRefreshFeed);
     return () => window.removeEventListener('refreshFeed', handleRefreshFeed);
-  }, [account]);
+  }, [connected, publicKey]);
 
   // Scroll to post from notification when location state has scrollToPostId
   useEffect(() => {
@@ -139,7 +139,7 @@ const Home = () => {
 
       // 1. Load following list
       console.log('🔄 [Home] Calling getFollowing from followService...');
-      const followingResult = await getFollowing(account);
+      const followingResult = await getFollowing(publicKey.toString());
 
       let followingAddresses = [];
 
@@ -156,12 +156,12 @@ const Home = () => {
 
       // 2. Load posts from followed users + own posts
       // ALWAYS include current user's address to show their own posts in feed
-      const addressesToFetch = [...followingAddresses, account.toLowerCase()];
+      const addressesToFetch = [...followingAddresses, publicKey.toString().toLowerCase()];
       const uniqueAddresses = [...new Set(addressesToFetch)]; // Remove duplicates
 
       console.log('🔵 [Home] Loading posts from followed creators + own posts...');
       console.log('📋 [Home] Fetching from addresses:', uniqueAddresses.length);
-      console.log('👤 [Home] Your address:', account.toLowerCase());
+      console.log('👤 [Home] Your address:', publicKey.toString().toLowerCase());
       console.log('👥 [Home] Following:', followingAddresses.length, 'users');
 
       // Fetch posts ONLY from these addresses (followed + self)
@@ -201,7 +201,7 @@ const Home = () => {
       setContents(contentData);
 
       // Initialize likes and comments
-      if (contentData.length > 0 && account) {
+      if (contentData.length > 0 && publicKey) {
         const contentIds = contentData.map(content => content.id.toString());
         await initializeMultipleLikes(contentIds);
         await initializeMultipleComments(contentIds);
@@ -210,7 +210,7 @@ const Home = () => {
       // Optionally sync with blockchain if contract is available
       if (contract && contract.getFollowing) {
         try {
-          const blockchainFollowing = await contract.getFollowing(account);
+          const blockchainFollowing = await contract.getFollowing(publicKey.toString());
           console.log('🔗 [Home] Blockchain following:', blockchainFollowing.length, 'addresses');
 
           // You can compare and sync here if needed
@@ -235,10 +235,12 @@ const Home = () => {
 
   const loadStoriesData = async () => {
     try {
+      if (!connected || !publicKey) return;
+
       console.log('Loading stories from followed users...');
 
       // Get stories only from users the current user follows
-      const result = await SupabaseService.getFollowingStories(account);
+      const result = await SupabaseService.getFollowingStories(publicKey.toString());
 
       if (!result.success) {
         console.error('Error loading stories:', result.error);
@@ -277,7 +279,11 @@ const Home = () => {
 
   const deletePost = async (postId) => {
     try {
-      const result = await SupabaseService.deletePost(postId, account);
+      if (!publicKey) {
+        toast.error('Wallet not connected');
+        return;
+      }
+      const result = await SupabaseService.deletePost(postId, publicKey.toString());
 
       if (!result.success) {
         console.error('Error deleting post:', result.error);
@@ -575,7 +581,7 @@ const Home = () => {
       }
     };
 
-    const isOwnPost = account && content.creator === account;
+    const isOwnPost = publicKey && content.creator === publicKey.toString().toLowerCase();
 
     return (
       <div id={`post-${content.id}`} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6 transition-all">

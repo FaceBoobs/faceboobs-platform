@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { Edit, UserPlus, UserMinus, Grid, Trash2 } from 'lucide-react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useSolanaApp } from '../contexts/SolanaAppContext';
 import { useToast } from '../contexts/ToastContext';
 import EditProfileModal from '../components/EditProfileModal';
@@ -11,6 +12,7 @@ import { SupabaseService } from '../services/supabaseService';
 import { supabase } from '../supabaseClient';
 
 const Profile = () => {
+  const { publicKey, connected } = useWallet();
   const { account, user, getMediaUrl, loading: appLoading, refreshUser } = useSolanaApp();
   const { toast } = useToast();
   const { address } = useParams();
@@ -18,8 +20,9 @@ const Profile = () => {
   const navigate = useNavigate();
 
   // In Supabase the unique key is wallet_address
-  const isOwnProfile = !address || address?.toLowerCase() === account?.toLowerCase();
-  const profileAddress = (address || account || '').toLowerCase();
+  const myAddress = publicKey ? publicKey.toString().toLowerCase() : null;
+  const isOwnProfile = !address || address?.toLowerCase() === myAddress;
+  const profileAddress = (address || myAddress || '').toLowerCase();
 
   const [profileData, setProfileData] = useState(null);
   const [userContents, setUserContents] = useState([]);
@@ -39,12 +42,12 @@ const Profile = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileAddress, account, user?.wallet_address]);
 
-  // Load user purchases once when account is available (only when viewing others)
+  // Load user purchases once when wallet is connected (only when viewing others)
   useEffect(() => {
-    if (account && !isOwnProfile) loadUserPurchases();
+    if (myAddress && !isOwnProfile) loadUserPurchases();
     else setUserPurchases([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, isOwnProfile]);
+  }, [myAddress, isOwnProfile]);
 
   useEffect(() => {
     const handleRefreshFeed = () => {
@@ -89,12 +92,12 @@ const Profile = () => {
 
   const loadUserPurchases = async () => {
     try {
-      if (!account) {
+      if (!myAddress) {
         setUserPurchases([]);
         return;
       }
 
-      const result = await SupabaseService.getUserPurchases(account.toLowerCase());
+      const result = await SupabaseService.getUserPurchases(myAddress);
       if (result.success && result.data) {
         const purchasedIds = result.data.map((p) => p.blockchain_content_id).filter(Boolean);
         setUserPurchases(purchasedIds);
@@ -218,9 +221,11 @@ const Profile = () => {
       }
 
       // 3) Following status (Supabase)
-      if (!isOwnProfile && account) {
+      if (!isOwnProfile && myAddress) {
         try {
-          const followResult = await SupabaseService.isFollowing(account.toLowerCase(), profileAddress);
+          console.log('🔍 Checking if following:', { myAddress, profileAddress });
+          const followResult = await SupabaseService.isFollowing(myAddress, profileAddress);
+          console.log('✅ Following status:', followResult);
           if (followResult.success) setIsFollowing(!!followResult.isFollowing);
         } catch (e) {
           console.log('Unable to check following status:', e);
@@ -233,18 +238,30 @@ const Profile = () => {
 
  const handleFollow = async () => {
   try {
-    if (!account) {
-      toast.error('Connect your wallet first');
+    if (!connected || !publicKey) {
+      toast.error('Connect your Solana wallet first');
       return;
     }
+
+    const myAddress = publicKey.toString().toLowerCase();
+    const targetAddress = profileAddress.toLowerCase();
+
+    console.log('🔄 Follow action:', {
+      myAddress,
+      targetAddress,
+      willUnfollow: isFollowing
+    });
 
     const willUnfollow = isFollowing; // stato prima del click
 
     const result = willUnfollow
-      ? await SupabaseService.unfollowUser(account.toLowerCase(), profileAddress)
-      : await SupabaseService.followUser(account.toLowerCase(), profileAddress);
+      ? await SupabaseService.unfollowUser(myAddress, targetAddress)
+      : await SupabaseService.followUser(myAddress, targetAddress);
+
+    console.log('📬 Follow result:', result);
 
     if (!result.success) {
+      console.error('❌ Follow failed:', result.error);
       toast.error('Follow action failed: ' + (result.error || 'Unknown error'));
       return;
     }
@@ -256,6 +273,7 @@ const Profile = () => {
     await loadProfileData();
 
     toast.success(willUnfollow ? 'Unfollowed successfully' : 'Following!');
+    console.log('✅ Follow action completed');
   } catch (e) {
     console.error('❌ Follow error:', e);
     toast.error('Follow action failed: ' + (e?.message || String(e)));
@@ -266,8 +284,8 @@ const Profile = () => {
   const formatAddress = (addr) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
   const handleSaveProfile = async (newProfile) => {
-    if (!account) {
-      toast.error('Connect your wallet first');
+    if (!connected || !publicKey) {
+      toast.error('Connect your Solana wallet first');
       return;
     }
 
@@ -277,12 +295,14 @@ const Profile = () => {
     }
 
     try {
+      const myAddress = publicKey.toString().toLowerCase();
+
       // 1) optional avatar upload
       let avatarUrl = profileData?.avatarUrl || null;
 
       if (newProfile.avatarFile) {
         const fileExt = newProfile.avatarFile.name.split('.').pop();
-        const fileName = `avatars/${account.toLowerCase()}_${Date.now()}.${fileExt}`;
+        const fileName = `avatars/${myAddress}_${Date.now()}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, newProfile.avatarFile, {
           upsert: true
@@ -295,7 +315,7 @@ const Profile = () => {
 
       // 2) update user row
       const result = await SupabaseService.createOrUpdateUser({
-        wallet_address: account.toLowerCase(),
+        wallet_address: myAddress,
         username: newProfile.username.trim(),
         bio: newProfile.bio || null,
         avatar_url: avatarUrl

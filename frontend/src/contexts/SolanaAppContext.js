@@ -64,19 +64,27 @@ export const SolanaAppProvider = ({ children }) => {
       }
 
       // Create default user row if missing
+      console.log('🆕 Creating new user for Solana address:', accountLower);
       const defaultUser = {
         wallet_address: accountLower,
+        solana_address: accountLower,
         username: `User_${accountLower.slice(0, 8)}`,
         bio: null,
         avatar_url: null,
         is_creator: false,
         followers_count: 0,
-        following_count: 0
+        following_count: 0,
+        created_at: new Date().toISOString()
       };
 
-      const upsert = await SupabaseService.createOrUpdateUser(defaultUser);
-      if (!upsert?.success) throw new Error(upsert?.error || 'Failed to create user');
+      // Use createUser (INSERT) since we already know the user doesn't exist.
+      const upsert = await SupabaseService.createUser(defaultUser);
+      if (!upsert?.success) {
+        console.error('❌ Failed to create user:', upsert?.error);
+        throw new Error(upsert?.error || 'Failed to create user');
+      }
 
+      console.log('✅ New user registered:', accountLower);
       const res2 = await SupabaseService.getUser(accountLower);
       if (res2?.success) setUser(res2.data || null);
     } catch (e) {
@@ -87,9 +95,95 @@ export const SolanaAppProvider = ({ children }) => {
     }
   }, [accountLower]);
 
+  // Auto-register user when Solana wallet connects
   useEffect(() => {
-    refreshUser();
-  }, [refreshUser, connected]);
+    const registerOrLoadUser = async () => {
+      if (!publicKey || !connected) {
+        console.log('🔒 Wallet not connected');
+        setUser(null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
+      const solanaAddress = publicKey.toString().toLowerCase();
+      console.log('');
+      console.log('═══════════════════════════════════════');
+      console.log('🔐 Solana Wallet Connected!');
+      console.log('═══════════════════════════════════════');
+      console.log('📍 Solana Address:', publicKey.toString());
+      console.log('📍 Normalized:', solanaAddress);
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        // 1. Check if user exists
+        console.log('🔍 Checking if user exists in database...');
+        const userResult = await SupabaseService.getUser(solanaAddress);
+
+        if (userResult?.success && userResult.data) {
+          console.log('✅ User found:', userResult.data.username);
+          setUser(userResult.data);
+          console.log('═══════════════════════════════════════');
+          return;
+        }
+
+        // 2. User doesn't exist - create new record
+        console.log('⚠️ User not found - creating new user...');
+        const newUser = {
+          wallet_address: solanaAddress,
+          solana_address: solanaAddress,
+          username: `User_${solanaAddress.slice(0, 8)}`,
+          bio: null,
+          avatar_url: null,
+          is_creator: false,
+          followers_count: 0,
+          following_count: 0,
+          created_at: new Date().toISOString()
+        };
+
+        console.log('💾 Inserting user data:', {
+          wallet_address: newUser.wallet_address,
+          username: newUser.username
+        });
+
+        // Use createUser (INSERT) since we already know the user doesn't exist.
+        // Avoids the conflict-resolution path of upsert for brand-new wallets.
+        const createResult = await SupabaseService.createUser(newUser);
+
+        if (!createResult?.success) {
+          console.error('❌ Failed to create user:', createResult?.error);
+          throw new Error(createResult?.error || 'Failed to create user');
+        }
+
+        console.log('✅ New user registered:', solanaAddress);
+
+        // 3. Fetch the newly created user
+        const fetchResult = await SupabaseService.getUser(solanaAddress);
+        if (fetchResult?.success && fetchResult.data) {
+          console.log('✅ User loaded:', fetchResult.data.username);
+          setUser(fetchResult.data);
+        }
+
+        console.log('═══════════════════════════════════════');
+      } catch (error) {
+        console.error('');
+        console.error('═══════════════════════════════════════');
+        console.error('❌ ERROR registering/loading user:');
+        console.error('═══════════════════════════════════════');
+        console.error('Message:', error.message);
+        console.error('Stack:', error.stack);
+        console.error('═══════════════════════════════════════');
+        setUser(null);
+        setError(error?.message || String(error));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    registerOrLoadUser();
+  }, [publicKey, connected]);
 
   // Balance helper
   const getBalanceSOL = useCallback(async () => {

@@ -2,12 +2,14 @@
 import React, { useState } from 'react';
 import { Upload, DollarSign, Lock, Globe, ArrowLeft, Sparkles, X, Zap } from 'lucide-react';
 import { useSolanaApp } from '../contexts/SolanaAppContext';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import { SupabaseService } from '../services/supabaseService';
 
 const CreatePost = () => {
   const { account, user } = useSolanaApp();
+  const { publicKey, connected } = useWallet();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -138,13 +140,18 @@ const CreatePost = () => {
       const contentHash = `content_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       const contentId = Math.floor(Math.random() * 2147483647);
 
-      const normalizedAddress = account.toLowerCase();
+      if (!connected || !publicKey) {
+        throw new Error('Wallet not connected');
+      }
+
+      const normalizedAddress = publicKey.toString().toLowerCase();
       console.log('📝 Creating post with Solana address:', normalizedAddress);
 
       const postData = {
         content_id: contentId,
+        creator_solana_address: normalizedAddress,
         creator_address: normalizedAddress,
-        username: user?.username || `User${account.substring(0, 6)}`,
+        username: user?.username || `User${normalizedAddress.substring(0, 6)}`,
         description: formData.description || '',
         content_hash: contentHash,
         image_url: base64Data,
@@ -210,14 +217,19 @@ const CreatePost = () => {
 
       const contentHash = `story_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-      const normalizedAddress = account.toLowerCase();
+      if (!connected || !publicKey) {
+        throw new Error('Wallet not connected');
+      }
+
+      const normalizedAddress = publicKey.toString().toLowerCase();
       console.log('📝 Creating story with Solana address:', normalizedAddress);
 
       const expiryTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       const storyData = {
+        creator_solana_address: normalizedAddress,
         creator_address: normalizedAddress,
-        username: user?.username || `User${account.substring(0, 6)}`,
+        username: user?.username || `User${normalizedAddress.substring(0, 6)}`,
         content: formData.description || '',
         content_hash: contentHash,
         image_url: imageUrl,

@@ -109,7 +109,7 @@ export const unfollowUser = async (followerAddress, followedAddress) => {
 /**
  * Get list of addresses that a user is following
  * @param {string} userAddress - Address of the user
- * @returns {Promise<{success: boolean, data?: Array<{followed_address: string}>, error?: string}>}
+ * @returns {Promise<{success: boolean, data?: Array<string>, error?: string}>}
  */
 export const getFollowing = async (userAddress) => {
   try {
@@ -154,7 +154,7 @@ export const getFollowing = async (userAddress) => {
 /**
  * Get list of addresses that follow a user (followers)
  * @param {string} userAddress - Address of the user
- * @returns {Promise<{success: boolean, data?: Array<{follower_address: string}>, error?: string}>}
+ * @returns {Promise<{success: boolean, data?: Array<string>, error?: string}>}
  */
 export const getFollowers = async (userAddress) => {
   try {

@@ -598,11 +598,13 @@ const followingAddresses = followingData?.map(f => f.followed_solana_address) ||
       const { data, error } = await supabase
         .from('users')
         .upsert([userData], { onConflict: 'wallet_address' })
-        .select()
-        .single();
+        .select();
 
       if (error) throw error;
-      return { success: true, data };
+      // .select() returns an array; .single() was removed to avoid PGRST116
+      // when RLS blocks the post-upsert SELECT (row still gets written).
+      const result = Array.isArray(data) ? data[0] ?? null : data ?? null;
+      return { success: true, data: result };
     } catch (error) {
       console.error('Error creating/updating user:', error);
       return { success: false, error: error.message };
@@ -615,11 +617,12 @@ static async getUser(address) {
     const normalized = address?.toLowerCase();
     console.log('   - Normalized (lowercase):', normalized);
 
+    // Try to find user by wallet_address OR solana_address
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('wallet_address', normalized) // SEMPRE usa toLowerCase
-      .maybeSingle(); // ✅ evita 406 quando l’utente non esiste
+      .or(`wallet_address.eq.${normalized},solana_address.eq.${normalized}`)
+      .maybeSingle(); // ✅ evita 406 quando l'utente non esiste
 
     console.log('📬 [SupabaseService.getUser] Query result:', {
       found: !!data,
@@ -661,7 +664,7 @@ static async getUser(address) {
     }
   }
 
-  // Follows (snake_case: follower_address, followed_address)
+  // Follows (Solana addresses)
   static async followUser(followerAddress, followedAddress) {
     try {
       const followerLower = followerAddress?.toLowerCase();
@@ -675,8 +678,9 @@ static async getUser(address) {
       const { data: existingFollow, error: checkError } = await supabase
         .from('follows')
         .select('id')
-        .eq('follower_address', followerLower)
-        .eq('followed_address', followedLower)
+        .eq('blockchain', 'solana')
+        .eq('follower_solana_address', followerLower)
+        .eq('followed_solana_address', followedLower)
         .maybeSingle();
 
       if (checkError) throw checkError;
@@ -689,8 +693,10 @@ static async getUser(address) {
       const { data: insertData, error: insertError } = await supabase
         .from('follows')
         .insert([{
-          follower_address: followerLower,
-          followed_address: followedLower
+          blockchain: 'solana',
+          follower_solana_address: followerLower,
+          followed_solana_address: followedLower,
+          created_at: new Date().toISOString()
         }])
         .select();
 
@@ -721,8 +727,9 @@ static async getUser(address) {
       const { error: deleteError } = await supabase
         .from('follows')
         .delete()
-        .eq('follower_address', followerLower)
-        .eq('followed_address', followedLower);
+        .eq('blockchain', 'solana')
+        .eq('follower_solana_address', followerLower)
+        .eq('followed_solana_address', followedLower);
 
       if (deleteError) throw deleteError;
 
@@ -750,8 +757,9 @@ static async getUser(address) {
       const { data, error } = await supabase
         .from('follows')
         .select('id')
-        .eq('follower_address', followerLower)
-        .eq('followed_address', followedLower)
+        .eq('blockchain', 'solana')
+        .eq('follower_solana_address', followerLower)
+        .eq('followed_solana_address', followedLower)
         .maybeSingle();
 
       if (error) throw error;
@@ -770,12 +778,13 @@ static async getUser(address) {
 
       const { data, error } = await supabase
         .from('follows')
-        .select('follower_address')
-        .eq('followed_address', addr);
+        .select('follower_solana_address')
+        .eq('blockchain', 'solana')
+        .eq('followed_solana_address', addr);
 
       if (error) throw error;
 
-      return { success: true, data: (data || []).map(f => f.follower_address) };
+      return { success: true, data: (data || []).map(f => f.follower_solana_address) };
     } catch (error) {
       console.error('❌ Error fetching followers:', error);
       return { success: false, error: error.message };
@@ -789,12 +798,13 @@ static async getUser(address) {
 
       const { data, error } = await supabase
         .from('follows')
-        .select('followed_address')
-        .eq('follower_address', addr);
+        .select('followed_solana_address')
+        .eq('blockchain', 'solana')
+        .eq('follower_solana_address', addr);
 
       if (error) throw error;
 
-      return { success: true, data: (data || []).map(f => f.followed_address) };
+      return { success: true, data: (data || []).map(f => f.followed_solana_address) };
     } catch (error) {
       console.error('❌ Error fetching following:', error);
       return { success: false, error: error.message };
@@ -811,19 +821,21 @@ static async getUser(address) {
         throw new Error('Invalid follower/followed address');
       }
 
-      // Count followers of the followed user
+      // Count followers of the followed user (Solana only)
       const { count: followersCount, error: followersError } = await supabase
         .from('follows')
         .select('*', { count: 'exact', head: true })
-        .eq('followed_address', followedLower);
+        .eq('blockchain', 'solana')
+        .eq('followed_solana_address', followedLower);
 
       if (followersError) throw followersError;
 
-      // Count following of the follower user
+      // Count following of the follower user (Solana only)
       const { count: followingCount, error: followingError } = await supabase
         .from('follows')
         .select('*', { count: 'exact', head: true })
-        .eq('follower_address', followerLower);
+        .eq('blockchain', 'solana')
+        .eq('follower_solana_address', followerLower);
 
       if (followingError) throw followingError;
 
